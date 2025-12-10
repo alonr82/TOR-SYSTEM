@@ -1,8 +1,14 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -pedantic -std=c11 -g
-INCLUDES = -Icommon -Iserver/header -Iclient -Irelay
 
-SRC_SERVER = server/src/main_test.c server/src/server.c server/src/relay_manager.c
+INCLUDES = -Icommon -Iserver/header -Iserver/configurations/header -Iclient -Irelay
+
+SRC_SERVER = \
+    server/src/main_test.c \
+    server/src/server.c \
+    server/src/relay_manager.c \
+    server/configurations/src/dir_server_config.c
+
 OBJ_SERVER = $(SRC_SERVER:.c=.o)
 SERVER     = tor_server
 

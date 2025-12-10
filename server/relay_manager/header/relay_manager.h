@@ -1,3 +1,5 @@
+#ifndef RELAY_MANAGER_H
+#define RELAY_MANAGER_H
 #include "../common/common.h"
 
 typedef enum 
@@ -65,3 +67,5 @@ bool remove_relay(uint32_t relay_id);
  * @return uint32_t the number of relay descriptors written to output
  */
 uint32_t get_relay_batch(relay_decript_t *output, uint32_t* start_point, uint32_t max);
+
+#endif

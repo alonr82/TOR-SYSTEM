@@ -1,13 +1,39 @@
-#include "/home/alon/Desktop/TOR system/server/relay_manager/header/relay_manager.h"
-#include "/home/alon/Desktop/TOR system/server/configurations/header/dir_server_config.h"
-int main(int argc, char *argv[])
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "relay_server_config.h"
+
+int main(int argc, char **argv)
 {
-    server_config_metadata_t* server_conf = fetch_server_config("serverconfig.conf");
-    if(server_conf != NULL)
+    bool ok = true;
+    relay_config_metadata_t *cfg = NULL;
+
+    ok = parse_args(argc, (const char **)argv, &cfg);
+    if (!ok)
     {
-        printf("server ip: %hhu.%hhu.%hhu.%hhu\n",server_conf->ip_server[0],server_conf->ip_server[1],server_conf->ip_server[2],server_conf->ip_server[3]);
-        printf("server port: %hu\n",server_conf->port_server);
-        free(server_conf);
+        printf("parse_args failed\n");
     }
-    return 0;
+    else
+    {
+        printf("Relay bind: %u.%u.%u.%u:%u\n",
+               cfg->relay_conf.ip_server[0],
+               cfg->relay_conf.ip_server[1],
+               cfg->relay_conf.ip_server[2],
+               cfg->relay_conf.ip_server[3],
+               cfg->relay_conf.port_server);
+
+        printf("Directory : %u.%u.%u.%u:%u\n",
+               cfg->dir_conf.ip_server[0],
+               cfg->dir_conf.ip_server[1],
+               cfg->dir_conf.ip_server[2],
+               cfg->dir_conf.ip_server[3],
+               cfg->dir_conf.port_server);
+
+        free(cfg);
+        cfg = NULL;
+    }
+
+    return ok ? 0 : 1;
 }

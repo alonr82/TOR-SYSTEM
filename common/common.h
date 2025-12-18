@@ -11,6 +11,7 @@
 #define IP6_SIZE 16
 #define SUCCESS 0
 #define FAILURE -1
+#define SERVER_MSG_SIZE 4096
 
 typedef struct
 {
@@ -26,6 +27,11 @@ typedef struct
     relay_decript_t descriptor;
     uint32_t relay_id;
 }relay_data_t;
+
+typedef struct msg_server_buffer {
+    uint8_t data[SERVER_MSG_SIZE];
+} msg_server_buffer_t;
+
 
 
 

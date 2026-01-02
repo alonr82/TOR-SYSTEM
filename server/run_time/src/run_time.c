@@ -24,13 +24,71 @@ static void run_commands()
     }
 }
 
-static void client_callback(user_descriptor_t* user)
+relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_request_t* request)
 {
-    msg_server_buffer_t buffer_data;
-    uint32_t id = user->fd;
-    process_relay(user->fd, &buffer_data);
+    relay_decript_t* retval = calloc(1, sizeof(relay_decript_t));
+    if(retval != NULL)
+    {
+        struct sockaddr_in* addr_in = (struct sockaddr_in*)&user->addr;
+        retval->ip_type = 4;
+        memcpy(retval->relay_ip, &addr_in->sin_addr, IP4_SIZE);
+        retval->relay_port = request->relay_port;
+        retval->is_active = true;
+    }
+    return retval;
+}
+
+static bool client_callback(user_descriptor_t* user)
+{
+    bool retval = true;
+    relay_request_t request;
+    ssize_t recv_bytes = recv(user->fd, &request, sizeof(request), 0);
+    if (recv_bytes != sizeof(request))
+    {
+        fprintf(stderr, "Failed to receive full request\n");
+        close(user->fd);
+        retval = false;
+    }
+    else
+    {
+        if(request.request_type == RELAY_REG_SIGNUP)
+        {
+            relay_decript_t* relay_data = get_data_from_req(user,&request);
+            relay_data_t* new_relay = generate_relay(relay_data);
+            free(relay_data);
+            if (new_relay == NULL)
+            {
+                fprintf(stderr, "Failed to generate new relay\n");
+                close(user->fd);
+                retval = false;
+            }
+            else
+            {
+                relay_req_response_t response;
+                response.relay_id = new_relay->relay_id;
+                response.status = true;
+                ssize_t sent_bytes = send(user->fd, &response, sizeof(response), 0);
+                if (sent_bytes != sizeof(response))
+                {
+                    fprintf(stderr, "Failed to send full response\n");
+                    close(user->fd);
+                    retval = false;
+                }
+                else
+                {
+                    printf("Registered new relay with ID: %u\n", new_relay->relay_id);
+                    close(user->fd);
+                }
+            }
+        }
+        else if(request.request_type == RELAY_REG_SIGNOUT)
+        {
+            // Handle signout request if needed
+            close(user->fd);
+        }
+    }
     free(user);
-    return;
+    return retval;
 }
 
 static void* accept_loop_func(void* _)
@@ -87,5 +145,6 @@ server_running_status_e run_dir_server(const char *config_file)
         }
     }
     close(server_socket_fd);
+    free_server_config(config);
     return retval;
 }

@@ -1,39 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include "run_time.h"
 
-#include "relay_server_config.h"
-
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    bool ok = true;
-    relay_config_metadata_t *cfg = NULL;
-
-    ok = parse_args(argc, (const char **)argv, &cfg);
-    if (!ok)
-    {
-        printf("parse_args failed\n");
-    }
-    else
-    {
-        printf("Relay bind: %u.%u.%u.%u:%u\n",
-               cfg->relay_conf.ip_server[0],
-               cfg->relay_conf.ip_server[1],
-               cfg->relay_conf.ip_server[2],
-               cfg->relay_conf.ip_server[3],
-               cfg->relay_conf.port_server);
-
-        printf("Directory : %u.%u.%u.%u:%u\n",
-               cfg->dir_conf.ip_server[0],
-               cfg->dir_conf.ip_server[1],
-               cfg->dir_conf.ip_server[2],
-               cfg->dir_conf.ip_server[3],
-               cfg->dir_conf.port_server);
-
-        free(cfg);
-        cfg = NULL;
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <dir.cfg>\n", argv[0]);
+        return 1;
     }
 
-    return ok ? 0 : 1;
+    return (run_dir_server(argv[1]) == running_status_success) ? 0 : 1;
 }

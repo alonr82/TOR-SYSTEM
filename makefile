@@ -1,44 +1,67 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -pedantic -std=c11 -g
+LDFLAGS = -pthread
 
-INCLUDES = -Icommon -Iserver/header -Iserver/configurations/header -Iclient -Irelay
+INCLUDES = \
+	-Icommon \
+	-Iserver/configurations/header \
+	-Iserver/run_time/header \
+	-Iserver/connections_manager/header \
+	-Iserver/relay_manager/header \
+	-Isock_utilities/header\
+	-Irelay/relay_reg/header
 
-SRC_SERVER = \
-    server/src/main_test.c \
-    server/src/server.c \
-    server/src/relay_manager.c \
-    server/configurations/src/dir_server_config.c \
-    server/configurations/src/relay_server_config.c
-
-
-OBJ_SERVER = $(SRC_SERVER:.c=.o)
-SERVER     = tor_server
-
+DIR_BIN   = dir_server
+RELAY_BIN = relay_test
 DIR_CFG ?= dir.cfg
 
-all: $(SERVER)
+# ---------- Sources ----------
+SRC_DIR = \
+	server/src/main_test.c \
+	server/run_time/src/run_time.c \
+	server/configurations/src/dir_server_config.c \
+	server/connections_manager/src/relay_handler.c \
+	server/relay_manager/src/relay_manager.c \
+	sock_utilities/src/create_bind.c \
+	sock_utilities/src/accept.c
 
-$(SERVER): $(OBJ_SERVER)
-	$(CC) $(CFLAGS) $(OBJ_SERVER) -o $(SERVER)
+SRC_RELAY = \
+	relay/relay_main_test.c \
+	relay/relay_reg/src/realy_reg.c \
+	server/configurations/src/dir_server_config.c \
+	sock_utilities/src/connect_server.c
+
+OBJ_DIR   = $(SRC_DIR:.c=.o)
+OBJ_RELAY = $(SRC_RELAY:.c=.o)
+
+all: $(DIR_BIN) $(RELAY_BIN)
+
+$(DIR_BIN): $(OBJ_DIR)
+	$(CC) $(CFLAGS) $(OBJ_DIR) -o $@ $(LDFLAGS)
+
+$(RELAY_BIN): $(OBJ_RELAY)
+	$(CC) $(CFLAGS) $(OBJ_RELAY) -o $@ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-run10: $(SERVER)
+cfg:
 	@printf "ip=127.0.0.1\nport=9000\n" > $(DIR_CFG)
-	@for p in 8001 8002 8003 8004 8005 8006 8007 8008 8009 8010 ; do \
-		echo "----- relay port $$p -----" ; \
-		./$(SERVER) -p $$p $(DIR_CFG) ; \
-	done
+	@echo "Wrote $(DIR_CFG)"
 
-valgrind10: $(SERVER)
-	@printf "ip=127.0.0.1\nport=9000\n" > $(DIR_CFG)
-	@for p in 8001 8002 8003 8004 8005 8006 8007 8008 8009 8010 ; do \
-		echo "----- relay port $$p -----" ; \
-		valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(SERVER) -p $$p $(DIR_CFG) ; \
-	done
+run_dir: cfg $(DIR_BIN)
+	./$(DIR_BIN) $(DIR_CFG)
+
+run_relays10: cfg $(RELAY_BIN)
+	./$(RELAY_BIN) $(DIR_CFG) 10
+
+valgrind_dir: cfg $(DIR_BIN)
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(DIR_BIN) $(DIR_CFG)
+
+valgrind_relays10: cfg $(RELAY_BIN)
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(RELAY_BIN) $(DIR_CFG) 10
 
 clean:
-	rm -f $(OBJ_SERVER) $(SERVER) $(DIR_CFG)
+	rm -f $(OBJ_DIR) $(OBJ_RELAY) $(DIR_BIN) $(RELAY_BIN) $(DIR_CFG)
 
-.PHONY: all clean run10 valgrind10
+.PHONY: all clean cfg run_dir run_relays10 valgrind_dir valgrind_relays10

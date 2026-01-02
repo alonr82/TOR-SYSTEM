@@ -2,6 +2,7 @@
 #define RUN_TIME_H
 
 #include "sock_utilities.h"
+#include "relay_reg.h"
 
 #define INPUT_SIZE 256
 typedef enum
@@ -22,7 +23,7 @@ static void run_commands();
  * 
  * @param user 
  */
-static void client_callback(user_descriptor_t* user);
+static bool client_callback(user_descriptor_t* user);
 
 /**
  * @brief this function is the accept loop thread function
@@ -37,5 +38,11 @@ static void* accept_loop_func(void* _);
  * @return server_running_status_e 
  */
 server_running_status_e run_dir_server(const char *config_file);
+
+/**
+ * @brief this function extracts relay data from the request
+ * 
+ */
+relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_request_t* request);
 
 #endif

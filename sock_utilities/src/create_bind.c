@@ -4,13 +4,13 @@
 int create_and_bind(const server_config_metadata_t *config)
 {
     int retval = SUCCESS;
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res = NULL;
     memset(&hints, 0, sizeof hints);
     hints.ai_family   = AF_UNSPEC;      
     hints.ai_socktype = SOCK_STREAM;   
     hints.ai_flags    = AI_PASSIVE; 
     char port_str[STR_PORT_SIZE];
-    snprintf(port_str, sizeof(port_str),"%u",ntohs(config->port_server));
+    snprintf(port_str, sizeof(port_str), "%u", (unsigned)config->port_server);
     if (getaddrinfo(NULL, port_str, &hints, &res) != 0) 
     {
         printf("Failed to getaddr on %s\n", port_str);
@@ -31,9 +31,10 @@ int create_and_bind(const server_config_metadata_t *config)
             setsockopt(retval, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
             if (bind(retval, res->ai_addr, res->ai_addrlen) == -1)
             {
-                printf("Failed to bind on %s\n", port_str);
-                freeaddrinfo(res);
+                perror("bind");
+                close(retval);
                 retval = FAILURE;
+
             }
         }
     }

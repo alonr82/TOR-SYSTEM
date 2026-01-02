@@ -113,3 +113,17 @@ server_config_metadata_t* fetch_server_config(char* filepath)
     return NULL;
     
 }
+
+bool free_server_config(server_config_metadata_t *config)
+{
+    bool retval = true;
+    if(config != NULL)
+    {
+        free(config);
+    }
+    else
+    {
+        retval = false;
+    }
+    return retval;
+}

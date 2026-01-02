@@ -1,7 +1,7 @@
 #ifndef sock_UTILITIES_H
 #define sock_UTILITIES_H
 
-#include "server/configurations/header/dir_server_config.h"
+#include "dir_server_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +41,13 @@ int create_and_bind(const server_config_metadata_t *config);
 void accept_loop(int server_fd, void (*connection_handler)(user_descriptor_t* user));
 
 
+/**
+ * @brief this function connects to a remote server based on the given configuration
+ * 
+ * @param config pointer to the server configuration structure
+ * @return int the socket file descriptor if successful, -1 otherwise
+ */
+int connect_server(const server_config_metadata_t* config);
 
 
 #endif

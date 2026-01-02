@@ -4,10 +4,10 @@
 
 typedef enum 
 {
+    FAILED_ALLOCATION = -2,
     FAILED_INIT = -1,
     ALREADY_INIT = 1,
-    SUCCESS_INIT = 0,
-    FAILED_ALLOCATION = -2
+    SUCCESS_INIT = 0
 } status_init_e;
 
 typedef enum
@@ -46,11 +46,12 @@ free_status_e free_relay_manager();
 relay_data_t* get_relay(uint32_t relay_id);
 
 /**
- * @brief this function generates new relay
+ * @brief this function generates a new relay and adds it to the manager
  * 
- * @return relay_data_t* pointer to the new relay or NULL if there was a problem
+ * @param relay_info this struct contains the information about the relay to add
+ * @return relay_data_t* 
  */
-relay_data_t* generate_relay();
+relay_data_t* generate_relay(relay_decript_t *relay_info);
 
 /**
  * @brief this function removes the relay of the id we got
@@ -67,5 +68,16 @@ bool remove_relay(uint32_t relay_id);
  * @return uint32_t the number of relay descriptors written to output
  */
 uint32_t get_relay_batch(relay_decript_t *output, uint32_t* start_point, uint32_t max);
+
+/**
+ * @brief this function fetches the ip address from src to dest
+ * 
+ * @param dest 
+ * @param src 
+ * @param ip_type 
+ * @return true 
+ * @return false 
+ */
+bool fetch_ip_address(uint8_t* dest, uint8_t* src, uint8_t ip_type);
 
 #endif

@@ -96,7 +96,24 @@ relay_data_t* get_relay(uint32_t relay_id)
     return retval;
 }
 
-relay_data_t* generate_relay()
+bool fetch_ip_address(uint8_t* dest, uint8_t* src, uint8_t ip_type)
+{
+    bool retval = false;
+    if(ip_type == 4)
+    {
+        memset(dest, 0, IP6_SIZE);
+        memcpy(dest + 12, src, IP4_SIZE);
+        retval = true;
+    }
+    else if(ip_type == 6)
+    {
+        memcpy(dest, src, IP6_SIZE);
+        retval = true;
+    }
+    return retval;
+}
+
+relay_data_t* generate_relay(relay_decript_t *relay_info)
 {
     relay_data_t* retval = NULL;
     pthread_mutex_lock(&relay_manager_lock);
@@ -124,6 +141,9 @@ relay_data_t* generate_relay()
         items[max_item_index].data->relay_id = max_item_index;
         items[max_item_index].data->descriptor.relay_id = max_item_index;
         items[max_item_index].exists = true;
+        items[max_item_index].data->descriptor.relay_port = relay_info->relay_port;
+        items[max_item_index].data->descriptor.ip_type = relay_info->ip_type;
+        fetch_ip_address(items[max_item_index].data->descriptor.relay_ip, relay_info->relay_ip, relay_info->ip_type);
         retval = items[max_item_index++].data;
         pthread_mutex_unlock(&relay_manager_lock);
     }
@@ -135,6 +155,9 @@ relay_data_t* generate_relay()
         items[used_id].data = calloc(1, sizeof(relay_data_t));
         items[used_id].data->relay_id = used_id;
         items[used_id].data->descriptor.relay_id = used_id;
+        items[used_id].data->descriptor.relay_port = relay_info->relay_port;
+        items[used_id].data->descriptor.ip_type = relay_info->ip_type;
+        fetch_ip_address(items[used_id].data->descriptor.relay_ip, relay_info->relay_ip, relay_info->ip_type);
         items[used_id].exists = true;
         retval = items[used_id].data;
         pthread_mutex_unlock(&relay_manager_lock);

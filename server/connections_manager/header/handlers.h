@@ -2,7 +2,7 @@
 #define HANDLERS_H
 
 #include "sock_utilities.h"
-#include "common/common.h"
+#include "common.h"
 
 typedef enum
 {

@@ -48,8 +48,11 @@ bool fetch_server_port_config(server_config_metadata_t *server_config, char *lin
  */
 server_config_metadata_t* fetch_server_config(char* filepath);
 
-
-
+/**
+ * @brief this function frees the configuration
+ * 
+ */
+bool free_server_config(server_config_metadata_t *config);
 
 
 

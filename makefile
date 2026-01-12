@@ -23,13 +23,17 @@ SRC_DIR = \
 	server/connections_manager/src/relay_handler.c \
 	server/relay_manager/src/relay_manager.c \
 	sock_utilities/src/create_bind.c \
-	sock_utilities/src/accept.c
+	sock_utilities/src/accept.c \
+	sock_utilities/src/tor_in_out.c
 
 SRC_RELAY = \
 	relay/relay_main_test.c \
 	relay/relay_reg/src/realy_reg.c \
 	server/configurations/src/dir_server_config.c \
-	sock_utilities/src/connect_server.c
+	sock_utilities/src/connect_server.c \
+	server/relay_manager/src/relay_manager.c \
+	sock_utillities/src/relay_run_time.c
+
 
 OBJ_DIR   = $(SRC_DIR:.c=.o)
 OBJ_RELAY = $(SRC_RELAY:.c=.o)

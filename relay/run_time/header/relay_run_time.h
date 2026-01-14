@@ -34,4 +34,10 @@ static void* relay_accept_loop_func(void* _);
  */
 bool run_relay(const char * dir_cfg_path);
 
+/**
+ * @brief thia function process relay commands from the terminal.
+ * 
+ */
+static void relay_run_commands(void);
+
 #endif 

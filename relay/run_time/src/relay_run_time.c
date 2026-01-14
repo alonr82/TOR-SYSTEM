@@ -1,6 +1,37 @@
 #include "relay_run_time.h"
 
 static int relay_listen_fd;
+static relay_req_res_t* relay_signup_response;
+static volatile bool relay_running = true;
+static pthread_t accept_thread;
+
+
+static void relay_run_commands(void)
+{
+    char input[128];
+
+    while (relay_running)
+    {
+        if (fgets(input, sizeof(input), stdin) == NULL)
+            break;
+
+        input[strcspn(input, "\n")] = '\0';
+
+        if (strcmp(input, "exit") == 0)
+        {
+            printf("relay: shutting down...\n");
+            relay_running = false;
+
+            if (relay_listen_fd >= 0)
+            {
+                shutdown(relay_listen_fd, SHUT_RDWR);
+                close(relay_listen_fd);
+                relay_listen_fd = -1;
+            }
+            break;
+        }
+    }
+}
 
 static void relay_client_callback(user_descriptor_t* user)
 {
@@ -21,6 +52,8 @@ static void relay_client_callback(user_descriptor_t* user)
         else if(message.header.type == TOR_MSG_DATA)
         {
             printf("relay_run_time: recieved DATA message from client\n");
+            printf("relay[%u] ", relay_signup_response->signup_response.relay_id);
+            printf("the message is: %.*s\n", ntohs(message.header.payload_len), message.payload);
         }
         else
         {
@@ -36,8 +69,10 @@ static void* relay_accept_loop_func(void* _)
 {   
     (void)(_);
 
-    accept_loop(relay_listen_fd, relay_client_callback);
-
+    while (relay_running)
+    {
+        accept_loop(relay_listen_fd, relay_client_callback);
+    }
     return NULL;
 }
 
@@ -54,6 +89,7 @@ bool run_relay(const char * dir_cfg_path)
     }
     else
     {
+        relay_signup_response = signup_response;
         pthread_t accept_thread;
         if(pthread_create(&accept_thread, NULL, relay_accept_loop_func, NULL) != SUCCESS)
         {
@@ -63,6 +99,7 @@ bool run_relay(const char * dir_cfg_path)
         else
         {
             printf("relay_run_time: relay is running and accepting connections\n");
+            relay_run_commands();
             pthread_join(accept_thread, NULL);
         }
         free(signup_response);

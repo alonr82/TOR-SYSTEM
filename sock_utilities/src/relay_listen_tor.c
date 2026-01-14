@@ -41,6 +41,7 @@ int relay_listen_on_any_port(uint16_t *out_port)
             else
             {
                 uint16_t chosen_port = ntohs(addr.sin_port);
+                printf("relay_listen_tor: listening on port %u\n", chosen_port);
                 if (out_port) 
                 {
                     *out_port = chosen_port;

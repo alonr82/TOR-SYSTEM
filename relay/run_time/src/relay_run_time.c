@@ -52,7 +52,7 @@ static void relay_client_callback(user_descriptor_t* user)
         else if(message.header.type == TOR_MSG_DATA)
         {
             printf("relay_run_time: recieved DATA message from client\n");
-            printf("relay[%u] ", relay_signup_response->signup_response.relay_id);
+            printf("relay[%u] ", relay_signup_response->responese_details_u.signup_response.relay_id);
             printf("the message is: %.*s\n", ntohs(message.header.payload_len), message.payload);
         }
         else
@@ -90,7 +90,6 @@ bool run_relay(const char * dir_cfg_path)
     else
     {
         relay_signup_response = signup_response;
-        pthread_t accept_thread;
         if(pthread_create(&accept_thread, NULL, relay_accept_loop_func, NULL) != SUCCESS)
         {
             printf("relay_run_time: failed to create accept loop thread\n");

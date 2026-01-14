@@ -9,21 +9,6 @@
 #include "tor_protocol.h"
 #include "relay_reg.h"
 
-/**
- * @brief this function starts the relay's main runtime operations.
- * 
- * @param user represents the connected client's user descriptor.
- */
-static void relay_client_callback(user_descriptor_t* user);
-
-
-/**
- * @brief this function runs the relay accept loop in a separate thread.
- * 
- * @param _ 
- * @return void* 
- */
-static void* relay_accept_loop_func(void* _);
 
 /**
  * @brief this function runs the relay operations.
@@ -34,10 +19,6 @@ static void* relay_accept_loop_func(void* _);
  */
 bool run_relay(const char * dir_cfg_path);
 
-/**
- * @brief thia function process relay commands from the terminal.
- * 
- */
-static void relay_run_commands(void);
+
 
 #endif 

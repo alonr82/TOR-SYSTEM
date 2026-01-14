@@ -8,7 +8,9 @@
 #include "run_time.h"
 #include "relay_manager.h"
 #include <pthread.h>
+#include "common.h"
 
+#define MAX_RELAY_BATCH_SIZE 10
 #define INPUT_SIZE 256
 typedef enum
 {
@@ -17,23 +19,7 @@ typedef enum
 }server_running_status_e;
 
 
-/**
- * @brief this function reads commands
- * 
- */
-static void run_commands();
 
-/**
- * @brief this function is the callback for new relays/clients
- * 
- * @param user 
- */
-static void client_callback(user_descriptor_t* user);
-/**
- * @brief this function is the accept loop thread function
- * 
- */
-static void* relay_accept_loop_func(void* _);
 
 /**
  * @brief this function starts to get connections for the directory server

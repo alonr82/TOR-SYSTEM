@@ -4,14 +4,15 @@
       "name": "Linux",
       "includePath": [
         "${workspaceFolder}/**",
-        "${workspaceFolder}/common",
-        "${workspaceFolder}/relay/run_time/header",
-        "${workspaceFolder}/relay/relay_reg/header",
+        "${workspaceFolder}/common/header",
         "${workspaceFolder}/sock_utilities/header",
         "${workspaceFolder}/server/configurations/header",
         "${workspaceFolder}/server/run_time/header",
         "${workspaceFolder}/server/connections_manager/header",
-        "${workspaceFolder}/server/relay_manager/header"
+        "${workspaceFolder}/server/relay_manager/header",
+        "${workspaceFolder}/relay/relay_reg/header",
+        "${workspaceFolder}/relay/run_time/header",
+        "${workspaceFolder}/client/create_circuit/header"
       ],
       "compilerPath": "/usr/bin/gcc",
       "cStandard": "c11",

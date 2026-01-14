@@ -1,7 +1,35 @@
 #include "sock_utilities.h"
 
+static  bool tor_msg_valid(const tor_msg_t *message)
+{
+    bool retval = true; 
+    if(!message)
+    {
+        retval = false;
+    }
+    else
+    {
+        uint16_t len = ntohs(message->header.payload_len);
+        if (len > sizeof(message->payload))
+        {
+            retval = false;
+        } 
+        if (message->header.type != TOR_MSG_EXTEND && message->header.type != TOR_MSG_DATA)
+        {
+            retval = false;
+        }
+        else
+        {
+            if (message->header.type == TOR_MSG_EXTEND && len != sizeof(tor_extend_t))
+            {
+                retval = false;
+            }
+        }
+    }
+    return retval;
+}
 
-static bool read_exact(int fd, void *buf, size_t expected_size)
+bool read_exact(int fd, void *buf, size_t expected_size)
 {
     bool retval = true;
     size_t offset = 0;
@@ -29,7 +57,7 @@ static bool read_exact(int fd, void *buf, size_t expected_size)
 }
 
 
-static bool write_exact(int fd, const void *buf, size_t expected_size)
+bool write_exact(int fd, const void *buf, size_t expected_size)
 {
     bool retval = true;
     size_t offset = 0;
@@ -84,31 +112,3 @@ bool tor_send_msg(int fd, const tor_msg_t *msg)
     return retval;
 }
 
-static  bool tor_msg_valid(const tor_msg_t *message)
-{
-    bool retval = true; 
-    if(!message)
-    {
-        retval = false;
-    }
-    else
-    {
-        uint16_t len = ntohs(message->header.payload_len);
-        if (len > sizeof(message->payload))
-        {
-            retval = false;
-        } 
-        if (message->header.type != TOR_MSG_EXTEND && message->header.type != TOR_MSG_DATA)
-        {
-            retval = false;
-        }
-        else
-        {
-            if (message->header.type == TOR_MSG_EXTEND && len != sizeof(tor_extend_t))
-            {
-                retval = false;
-            }
-        }
-    }
-    return retval;
-}

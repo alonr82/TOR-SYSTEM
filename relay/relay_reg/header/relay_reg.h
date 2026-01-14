@@ -9,56 +9,6 @@
 
 #define INPUT_SIZE 256
 
-typedef enum
-{
-    relay_success = 0,
-    relay_error
-}relay_code_e;
-
-typedef enum
-{
-    RELAY_REG_SIGNUP = 0,
-    RELAY_REG_SIGNOUT
-} relay_request_e;
-
-
-
-typedef struct
-{
-    uint16_t relay_port;
-}relay_signup_request_t;
-
-typedef struct 
-{
-    uint32_t relay_id;
-}relay_signout_request_t;
-
-typedef struct
-{
-    relay_request_e request_type;
-    relay_signout_request_t signout_request;
-    relay_signup_request_t signup_request;
-}relay_req_t;
-
-
-typedef struct
-{
-    bool status;
-}relay_signout_response_t;
-
-typedef struct 
-{
-    uint32_t relay_id;
-    bool status;
-}relay_signup_response_t;
-
-typedef struct 
-{
-    relay_request_e request_type;
-    relay_signup_response_t signup_response;
-    relay_signout_response_t signout_response;
-}relay_req_res_t;
-
 
 /**
  * @brief this function connects to the directory server and signs up the relay

@@ -22,6 +22,28 @@ static void run_commands()
     }
 }
 
+static bool handle_send_relay(int client_fd)
+{
+    bool retval =true;
+    uint32_t start = 0;
+    relay_decript_t *relay_list = calloc(MAX_RELAY_BATCH_SIZE, sizeof(relay_decript_t));
+    if(relay_list == NULL)
+    {
+        retval = false;
+    }
+    else
+    {
+        uint32_t fetched_relays = get_relay_batch(relay_list, &start, MAX_RELAY_BATCH_SIZE);
+        if(write_exact(client_fd, relay_list, fetched_relays * sizeof(relay_decript_t)) == false)
+        {
+            retval = false;
+        }
+        free(relay_list);
+    }
+    return retval;
+
+}
+
 relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_req_t* request)
 {
     relay_decript_t* retval = calloc(1, sizeof(relay_decript_t));
@@ -30,7 +52,7 @@ relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_req_t* request
         struct sockaddr_in* addr_in = (struct sockaddr_in*)&user->addr;
         retval->ip_type = 4;
         memcpy(retval->relay_ip, &addr_in->sin_addr, IP4_SIZE);
-        retval->relay_port = request->signup_request.relay_port;
+        retval->relay_port = request->request_details_u.signup_request.relay_port;
         retval->is_active = true;
     }
     return retval;
@@ -39,38 +61,36 @@ relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_req_t* request
 static void client_callback(user_descriptor_t* user)
 {
     relay_req_res_t retval = {0};
-    relay_req_t request = {0};
-    ssize_t recv_bytes = recv(user->fd, &request, sizeof(request), 0);
-    if (recv_bytes != sizeof(request))
+    request_t request = {0};
+    if (read_exact(user->fd, &request, sizeof(request_t)) == false)
     {
         fprintf(stderr, "Failed to receive full request\n");
         close(user->fd);
-        retval.signup_response.status = false;
-        retval.signout_response.status = false;
+        retval.responese_details_u.signup_response.status = false;
+        retval.responese_details_u.signout_response.status = false;
     }
     else
     {
-        if(request.request_type == RELAY_REG_SIGNUP)
+        if(request.request_type == RELAY_REQUEST && request.request_u.relay_req.request_type == RELAY_REG_SIGNUP)
         {
-            relay_decript_t* relay_data = get_data_from_req(user,&request);
+            relay_decript_t* relay_data = get_data_from_req(user,&request.request_u.relay_req);
             relay_data_t* new_relay = generate_relay(relay_data);
             free(relay_data);
             if (new_relay == NULL)
             {
                 fprintf(stderr, "Failed to generate new relay\n");
                 close(user->fd);
-                retval.signup_response.status = false;
+                retval.responese_details_u.signup_response.status = false;
             }
             else
             {
-                retval.signup_response.relay_id = new_relay->relay_id;
-                retval.signup_response.status = true;
-                ssize_t sent_bytes = send(user->fd, &retval, sizeof(relay_req_res_t), 0);
-                if (sent_bytes != sizeof(relay_req_res_t))
+                retval.responese_details_u.signup_response.relay_id = new_relay->relay_id;
+                retval.responese_details_u.signup_response.status = true;
+                if (write_exact(user->fd, &retval, sizeof(relay_req_res_t)) == false)
                 {
                     fprintf(stderr, "Failed to send full response\n");
                     close(user->fd);
-                    retval.signup_response.status = false;
+                    retval.responese_details_u.signup_response.status = false;
                 }
                 else
                 {
@@ -80,22 +100,25 @@ static void client_callback(user_descriptor_t* user)
             }
             
         }
-        else if(request.request_type == RELAY_REG_SIGNOUT)
+        else if(request.request_type == RELAY_REQUEST && request.request_u.relay_req.request_type == RELAY_REG_SIGNOUT)
         {
-            bool ret_value_remove = remove_relay(request.signout_request.relay_id);
-            retval.signout_response.status = ret_value_remove;
-            ssize_t sent_bytes = send(user->fd, &retval, sizeof(relay_req_res_t), 0);
-            if (sent_bytes != sizeof(relay_req_res_t))
+            bool ret_value_remove = remove_relay(request.request_u.relay_req.request_details_u.signout_request.relay_id);
+            retval.responese_details_u.signout_response.status = ret_value_remove;
+            if (write_exact(user->fd, &retval, sizeof(relay_req_res_t)) == false)
             {
                 fprintf(stderr, "Failed to send full response\n");
                 close(user->fd);
-                retval.signout_response.status = false;
+                retval.responese_details_u.signout_response.status = false;
             }
             else
             {
-                printf("Removed relay with ID: %u\n", request.signout_request.relay_id);
+                printf("Removed relay with ID: %u\n", request.request_u.relay_req.request_details_u.signout_request.relay_id);
                 close(user->fd);
             }
+        }
+        else if(request.request_type == CLIENT_REQUEST)
+        {
+            handle_send_relay(user->fd);
         }
     }
     free(user);

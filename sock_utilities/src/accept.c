@@ -25,8 +25,13 @@ void accept_loop(int server_fd, void (*connection_handler)(user_descriptor_t* us
         int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
         if (client_fd < 0)
         {
-            break;;
+            if (errno == EBADF || errno == EINVAL)
+                break;
+            if (errno == EINTR)
+                continue;
+            break;
         }
+
         user_descriptor_t* user_desc = malloc(sizeof(user_descriptor_t)); 
         user_desc->fd = client_fd;
         user_desc->addr = client_addr;

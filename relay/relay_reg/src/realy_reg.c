@@ -22,10 +22,11 @@ relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd
             }
             else
             {
-                relay_req_t req;
-                memset(&req, 0, sizeof(relay_req_t));
-                req.request_type = RELAY_REG_SIGNUP;
-                *relay_sock_fd = relay_listen_on_any_port(&req.signup_request.relay_port);
+                request_t req;
+                memset(&req, 0, sizeof(request_t));
+                req.request_type = RELAY_REQUEST;
+                req.request_u.relay_req.request_type = RELAY_REG_SIGNUP;
+                *relay_sock_fd = relay_listen_on_any_port(&req.request_u.relay_req.request_details_u.signup_request.relay_port);
                 if (*relay_sock_fd < 0) 
                 {
                     printf("relay: listen FAIL\n");
@@ -36,27 +37,25 @@ relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd
                 }
                 else
                 {
-                    ssize_t sent_bytes = send(sock_fd, &req, sizeof(relay_req_t), 0);
-                    if (sent_bytes != sizeof(relay_req_t))
+                    if (write_exact(sock_fd, &req, sizeof(request_t)) == false)
                     {
                         printf("relay: send FAIL\n");
                         retval = NULL;
-                        close(relay_sock_fd);
+                        close(*relay_sock_fd);
                     }
                     else
                     {
-                        ssize_t recv_bytes = recv(sock_fd, retval, sizeof(relay_req_res_t),0);
-                        if(recv_bytes != sizeof(relay_req_res_t))
+                        if (read_exact(sock_fd, retval, sizeof(relay_req_res_t)) == false)
                         {
                             printf("relay: recv FAIL\n");
                             retval = NULL;
-                            close(relay_sock_fd);
+                            close(*relay_sock_fd);
                         }
                         else
                         {
-                            if(retval->signup_response.status)
+                            if(retval->responese_details_u.signup_response.status)
                             {
-                                printf("relay: SIGNUP SUCCESS, id: %u\n", retval->signup_response.relay_id);
+                                printf("relay: SIGNUP SUCCESS, id: %u\n", retval->responese_details_u.signup_response.relay_id);
                             }
                             else
                             {
@@ -95,9 +94,8 @@ bool relay_connect_signout(const char *dif_cfg,relay_signup_response_t * signup_
             relay_req_t req;
             memset(&req, 0, sizeof(relay_req_t));
             req.request_type = RELAY_REG_SIGNOUT;
-            req.signout_request.relay_id = signup_response->relay_id;
-            ssize_t sent_bytes = send(sock_fd, &req, sizeof(relay_req_t), 0);
-            if (sent_bytes != sizeof(relay_req_t))
+            req.request_details_u.signout_request.relay_id = signup_response->relay_id;
+            if (write_exact(sock_fd, &req, sizeof(relay_req_t)) == false)
             {
                 printf("relay: SEND FAILD\n");
                 retval = false;
@@ -106,8 +104,7 @@ bool relay_connect_signout(const char *dif_cfg,relay_signup_response_t * signup_
             else
             {
                 relay_req_res_t response;
-                ssize_t recv_bytes = recv(sock_fd, &response, sizeof(relay_req_res_t),0);
-                if(recv_bytes != sizeof(relay_req_res_t))
+                if(read_exact(sock_fd, &response, sizeof(relay_req_res_t)) == false)
                 {
                     printf("relay: RECV FAILD\n");
                     retval = false;
@@ -115,7 +112,7 @@ bool relay_connect_signout(const char *dif_cfg,relay_signup_response_t * signup_
                 }
                 else
                 {
-                    if(response.signout_response.status)
+                    if(response.responese_details_u.signout_response.status)
                     {
                         printf("relay: SIGNOUT SUCCESS, id: %u\n", signup_response->relay_id);
                     }

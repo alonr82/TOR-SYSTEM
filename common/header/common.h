@@ -13,6 +13,7 @@
 #define FAILURE -1
 #define SERVER_MSG_SIZE 4096
 
+
 typedef struct
 {
     uint32_t relay_id;
@@ -31,6 +32,7 @@ typedef struct
 typedef struct msg_server_buffer {
     uint8_t data[SERVER_MSG_SIZE];
 } msg_server_buffer_t;
+
 
 
 

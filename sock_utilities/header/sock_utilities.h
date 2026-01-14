@@ -56,15 +56,7 @@ void accept_loop(int server_fd, void (*connection_handler)(user_descriptor_t* us
 int connect_server(const server_config_metadata_t* config);
 
 /**
- * @brief this function is a wrapper for the connection handler
- * 
- * @param arg pointer to the user descriptor
- * @return void* 
- */
-static void* connection_handler_wrapper(void* arg);
-
-/**
- * @brief this function reads an exact number of bytes from a socket
+ * @brief this function reads exact amount of bytes
  * 
  * @param fd 
  * @param buf 
@@ -72,18 +64,18 @@ static void* connection_handler_wrapper(void* arg);
  * @return true 
  * @return false 
  */
-static bool read_exact(int fd, void *buf, size_t expected_size);
+bool read_exact(int fd, void *buf, size_t expected_size);
 
 /**
- * @brief this function writes an exact number of bytes to a socket
+ * @brief this function writes to the socket exact amount of bytes
  * 
  * @param fd 
  * @param buf 
  * @param expected_size 
  * @return true 
- * @return false    
+ * @return false 
  */
-static bool write_exact(int fd, const void *buf, size_t expected_size);
+bool write_exact(int fd, const void *buf, size_t expected_size);
 
 /**
  * @brief this function receives a TOR message from a socket
@@ -105,14 +97,6 @@ bool tor_recv_msg(int fd, tor_msg_t *input);
 bool tor_send_msg(int fd, const tor_msg_t *msg);
 
 
-/**
- * @brief this function validates a TOR message
- * 
- * @param message 
- * @return true 
- * @return false 
- */
-static  bool tor_msg_valid(const tor_msg_t *message);
 
 /**
  * @brief Set the socket nonblock object

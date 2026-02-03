@@ -52,6 +52,10 @@ int relay_listen_on_any_port(uint16_t *out_port)
                     close(retval);
                     retval = FAILURE;
                 }
+                else
+                {
+                    set_socket_nonblock(retval);
+                }
             }
         }
     }

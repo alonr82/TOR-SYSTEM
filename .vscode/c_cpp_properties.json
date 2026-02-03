@@ -12,7 +12,8 @@
         "${workspaceFolder}/server/relay_manager/header",
         "${workspaceFolder}/relay/relay_reg/header",
         "${workspaceFolder}/relay/run_time/header",
-        "${workspaceFolder}/client/create_circuit/header"
+        "${workspaceFolder}/client/create_circuit/header",
+        "${workspaceFolder}/relay/forward_msg/header"
       ],
       "compilerPath": "/usr/bin/gcc",
       "cStandard": "c11",

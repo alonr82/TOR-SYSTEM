@@ -6,6 +6,7 @@
 #include <arpa/inet.h> 
 #include "common.h"
 #define TOR_MSG_SIZE 4096
+#define CIRCUIT_LEN 3
 
 typedef enum
 {

@@ -8,6 +8,7 @@
 #include "sock_utilities.h"
 #include "tor_protocol.h"
 #include "relay_reg.h"
+#include "forward_msg.h"
 
 
 /**

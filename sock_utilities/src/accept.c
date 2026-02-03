@@ -26,10 +26,21 @@ void accept_loop(int server_fd, void (*connection_handler)(user_descriptor_t* us
         if (client_fd < 0)
         {
             if (errno == EBADF || errno == EINVAL)
+            {
                 break;
+            }
             if (errno == EINTR)
+            {
                 continue;
-            break;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                continue; 
+            }
+            else
+            {
+                break;
+            }
         }
 
         user_descriptor_t* user_desc = malloc(sizeof(user_descriptor_t)); 

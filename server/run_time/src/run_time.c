@@ -34,9 +34,26 @@ static bool handle_send_relay(int client_fd)
     else
     {
         uint32_t fetched_relays = get_relay_batch(relay_list, &start, MAX_RELAY_BATCH_SIZE);
-        if(write_exact(client_fd, relay_list, fetched_relays * sizeof(relay_decript_t)) == false)
+        for(uint32_t index = 0; index < fetched_relays; index++)
+        {
+            printf("Relay index: %u, IP adress: %u.%u.%u.%u, Port: %u, Active: %u\n", index,
+                   relay_list[index].relay_ip[0],
+                   relay_list[index].relay_ip[1],
+                   relay_list[index].relay_ip[2],
+                   relay_list[index].relay_ip[3],
+                   relay_list[index].relay_port,
+                   relay_list[index].is_active);
+        }
+        if(write_exact(client_fd,&fetched_relays,sizeof(uint32_t)) == false)
         {
             retval = false;
+        }
+        else
+        {
+            if(write_exact(client_fd, relay_list, fetched_relays * sizeof(relay_decript_t)) == false)
+            {
+                retval = false;
+            }
         }
         free(relay_list);
     }
@@ -75,6 +92,12 @@ static void client_callback(user_descriptor_t* user)
         {
             relay_decript_t* relay_data = get_data_from_req(user,&request.request_u.relay_req);
             relay_data_t* new_relay = generate_relay(relay_data);
+            printf("Relay data: IP address: %u.%u.%u.%u, Port: %u\n",
+                   relay_data->relay_ip[0],
+                   relay_data->relay_ip[1],
+                   relay_data->relay_ip[2],
+                   relay_data->relay_ip[3],
+                   relay_data->relay_port);
             free(relay_data);
             if (new_relay == NULL)
             {

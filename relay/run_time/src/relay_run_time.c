@@ -24,7 +24,6 @@ static void relay_run_commands(void)
 
             if (relay_listen_fd >= 0)
             {
-                shutdown(relay_listen_fd, SHUT_RDWR);
                 close(relay_listen_fd);
                 relay_listen_fd = -1;
             }
@@ -47,7 +46,13 @@ static void relay_client_callback(user_descriptor_t* user)
     {
         if(message.header.type == TOR_MSG_EXTEND)
         {
-            printf("relay_run_time: recieved EXTEND message from client\n");
+            session_t session;
+            session.last_fd = user->fd;
+            session.next_fd = -1;
+            if((extend_connection(&session,&message)))
+            {
+                forward_messages(session.last_fd,session.next_fd);
+            }
         }
         else if(message.header.type == TOR_MSG_DATA)
         {
@@ -68,11 +73,7 @@ static void relay_client_callback(user_descriptor_t* user)
 static void* relay_accept_loop_func(void* _)
 {   
     (void)(_);
-
-    while (relay_running)
-    {
-        accept_loop(relay_listen_fd, relay_client_callback);
-    }
+    accept_loop(relay_listen_fd, relay_client_callback);
     return NULL;
 }
 
@@ -100,6 +101,7 @@ bool run_relay(const char * dir_cfg_path)
             printf("relay_run_time: relay is running and accepting connections\n");
             relay_run_commands();
             pthread_join(accept_thread, NULL);
+            relay_connect_signout(dir_cfg_path, &signup_response->responese_details_u.signup_response);
         }
         free(signup_response);
     }

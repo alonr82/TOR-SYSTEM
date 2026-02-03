@@ -102,7 +102,7 @@ bool fetch_ip_address(uint8_t* dest, uint8_t* src, uint8_t ip_type)
     if(ip_type == 4)
     {
         memset(dest, 0, IP6_SIZE);
-        memcpy(dest + 12, src, IP4_SIZE);
+        memcpy(dest, src, IP4_SIZE);  
         retval = true;
     }
     else if(ip_type == 6)
@@ -112,6 +112,7 @@ bool fetch_ip_address(uint8_t* dest, uint8_t* src, uint8_t ip_type)
     }
     return retval;
 }
+
 
 relay_data_t* generate_relay(relay_decript_t *relay_info)
 {
@@ -192,6 +193,7 @@ bool remove_relay(uint32_t relay_id)
         }
         else
         {
+            removed_id_stack[max_stack_index++] = relay_id;
             retval = true;
         }
     }
@@ -211,7 +213,6 @@ uint32_t get_relay_batch(relay_decript_t* out, uint32_t* start, uint32_t max)
         {
             memcpy(&out[found++], &items[index].data->descriptor, sizeof(relay_decript_t));
         }
-
         index = (index + 1) % items_length;
         count++;
     }

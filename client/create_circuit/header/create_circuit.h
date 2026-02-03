@@ -5,7 +5,7 @@
 #include "sock_utilities.h"
 #include "relay_reg.h"
 #include "dir_server_config.h"
-
+#include <time.h>
 #define MAX_RELAY_BATCH_SIZE 10
 
 /**

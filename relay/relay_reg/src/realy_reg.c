@@ -91,11 +91,12 @@ bool relay_connect_signout(const char *dif_cfg,relay_signup_response_t * signup_
         }
         else
         {
-            relay_req_t req;
-            memset(&req, 0, sizeof(relay_req_t));
-            req.request_type = RELAY_REG_SIGNOUT;
-            req.request_details_u.signout_request.relay_id = signup_response->relay_id;
-            if (write_exact(sock_fd, &req, sizeof(relay_req_t)) == false)
+            request_t req;
+            memset(&req, 0, sizeof(request_t));
+            req.request_type = RELAY_REQUEST;
+            req.request_u.relay_req.request_type = RELAY_REG_SIGNOUT;
+            req.request_u.relay_req.request_details_u.signout_request.relay_id = signup_response->relay_id;
+            if (write_exact(sock_fd, &req, sizeof(request_t)) == false)
             {
                 printf("relay: SEND FAILD\n");
                 retval = false;

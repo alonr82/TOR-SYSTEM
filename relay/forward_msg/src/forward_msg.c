@@ -78,6 +78,7 @@ void forward_messages(int last_fd, int next_fd)
                 else
                 {
                     printf("bytes recived <= 0\n");
+                    printf("Line 81\n");
                     break;
                 }
             }
@@ -95,6 +96,7 @@ void forward_messages(int last_fd, int next_fd)
                 else
                 {
                     printf("bytes recived <= 0\n");
+                    printf("Line 99\n");
                     break;
                 }
             }

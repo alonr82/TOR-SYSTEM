@@ -13,6 +13,7 @@ INCLUDES = \
 	-Isock_utilities/header \
 	-Irelay/relay_reg/header \
 	-Irelay/run_time/header \
+	-Irelay/forward_msg/header \
 	-Iclient/create_circuit/header
 
 # ---------- Binaries ----------
@@ -42,6 +43,7 @@ SRC_DIR = \
 SRC_RELAY = \
 	relay/relay_main_test.c \
 	relay/run_time/src/relay_run_time.c \
+	relay/forward_msg/src/forward_msg.c \
 	relay/relay_reg/src/realy_reg.c \
 	common/src/dir_server_config.c \
 	common/src/relay_server_config.c \
@@ -49,6 +51,7 @@ SRC_RELAY = \
 	sock_utilities/src/accept.c \
 	sock_utilities/src/relay_listen_tor.c \
 	sock_utilities/src/tor_in_out.c
+
 
 SRC_CLIENT = \
 	client/src/client_main.c \

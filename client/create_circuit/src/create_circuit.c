@@ -1,4 +1,5 @@
 #include "create_circuit.h"
+static bool create_circuit(relay_decript_t* relays_list, uint32_t relay_list_len);
 
 static relay_decript_t* get_list_from_dir_server(int sock_fd, uint32_t *relays_amount)
 {
@@ -44,50 +45,88 @@ bool connect_to_dir_server(const char *dir_cfg)
             {
                 uint32_t relays_amount = 0;
                 relay_decript_t* relay_list = get_list_from_dir_server(sock_fd, &relays_amount);
-                uint32_t index = 0;
-                while ( index < relays_amount)
+                if (!create_circuit(relay_list, relays_amount))
                 {
-                    printf("Relay ID: %u, IP Type: %u, Port: %u, Active: %u\n", (relay_list + index)->relay_id,
-                           (relay_list + index)->ip_type,
-                           (relay_list + index)->relay_port,
-                           (relay_list + index)->is_active);
-                    printf("IP: %u.%u.%u.%u\n", (relay_list + index)->relay_ip[0],
-                           (relay_list + index)->relay_ip[1],
-                           (relay_list + index)->relay_ip[2],
-                           (relay_list + index)->relay_ip[3]);
-                    index++;
+                    printf("create_circuit failed\n");
+                    retval = false;
                 }
                 free(relay_list);
-                
             }
-
         }
+        close(sock_fd);
     }
     free(cfg);
     return retval;
 }
 
+static uint32_t ipv4_bytes_to_nbo(const uint8_t ip[4])
+{
+    uint32_t retval =
+        ((uint32_t)ip[0] << 24) |
+        ((uint32_t)ip[1] << 16) |
+        ((uint32_t)ip[2] << 8)  |
+        ((uint32_t)ip[3]);
+    return htonl(retval);
+}
+
+
 static bool create_circuit(relay_decript_t* relays_list, uint32_t relay_list_len)
 {
-    bool retval = true;
-    tor_msg_t message;
-    message.header.type = TOR_MSG_EXTEND;
-    tor_extend_t extended_relay_data;
-    extended_relay_data.ip_v4 = relays_list[1].relay_ip;
-    extended_relay_data.port = relays_list[1].relay_port;
-    memcpy(message.payload, &extended_relay_data, sizeof(extended_relay_data));
-    int guard_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(guard_fd >= 0)
+    if (!relays_list || relay_list_len < 2)
     {
-        struct sockaddr_in addr;
-        memset(&addr,0,sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_port = relays_list[0].relay_port;
-        addr.sin_addr.s_addr = relays_list[0].relay_ip;
-        int connect_result = connect(guard_fd,(struct sockaddr*)&addr, sizeof(addr));
-        if(connect_result >= 0)
-        {
-            write_exact(guard_fd,&message,sizeof(message));
-        }
+        printf("create_circuit: need at least 2 relays\n");
+        return false;
     }
+    tor_msg_t message;
+    memset(&message, 0, sizeof(message));
+    message.header.type = TOR_MSG_EXTEND;
+    message.header.payload_len = htons(sizeof(tor_extend_t)); 
+
+    tor_extend_t ext;
+    memset(&ext, 0, sizeof(ext));
+    ext.ip_v4 = ipv4_bytes_to_nbo(relays_list[1].relay_ip);      
+    ext.port  = htons(relays_list[1].relay_port);             
+
+    memcpy(message.payload, &ext, sizeof(ext));
+    int guard_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (guard_fd < 0)
+    {
+        perror("socket");
+        return false;
+    }
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(relays_list[0].relay_port);          
+    addr.sin_addr.s_addr = ipv4_bytes_to_nbo(relays_list[0].relay_ip); 
+    if (connect(guard_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+    {
+        perror("connect");
+        close(guard_fd);
+        return false;
+    }
+
+    if (!tor_send_msg(guard_fd, &message)) 
+    {
+        printf("create_circuit: tor_send_msg EXTEND failed\n");
+        close(guard_fd);
+        return false;
+    }
+    tor_msg_t data;
+    memset(&data, 0, sizeof(data));
+    data.header.type = TOR_MSG_DATA;
+
+    const char *txt = "hi";
+    data.header.payload_len = htons((uint16_t)strlen(txt));
+    memcpy(data.payload, txt, strlen(txt));
+
+    if (!tor_send_msg(guard_fd, &data))
+    {
+        printf("create_circuit: tor_send_msg DATA failed\n");
+        close(guard_fd);
+        return false;
+    }
+
+    close(guard_fd);
+    return true;
 }

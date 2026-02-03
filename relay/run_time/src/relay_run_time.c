@@ -52,6 +52,10 @@ static void relay_client_callback(user_descriptor_t* user)
             if((extend_connection(&session,&message)))
             {
                 forward_messages(session.last_fd,session.next_fd);
+                close(session.next_fd);
+                close(session.last_fd);
+                free(user);
+                return;
             }
         }
         else if(message.header.type == TOR_MSG_DATA)

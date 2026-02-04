@@ -19,6 +19,12 @@ typedef enum {
     TOR_MSG_DATA   = 2
 } tor_msg_type_e;
 
+typedef enum
+{
+    ACK_EXTEND_OK = 1,
+    ACK_EXTEND_FAIL = 2
+}extend_ack_e;
+
 typedef struct 
 {
     uint8_t  type;   
@@ -108,5 +114,13 @@ typedef struct
     }request_u;
     
 }request_t;
+
+typedef struct
+{
+    int guard_fd;
+    uint32_t len;
+    uint32_t hops_created;
+    relay_decript_t relay_descripts[CIRCUIT_LEN];
+}circuit_t;
 
 #endif

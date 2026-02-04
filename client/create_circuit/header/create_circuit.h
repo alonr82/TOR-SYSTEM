@@ -18,7 +18,11 @@
  */
 bool connect_to_dir_server(const char *dir_cfg);
 
+int circuit_connect_guard(circuit_t * circuit);
 
+bool circuit_extend(circuit_t *circuit);
+
+bool build_default_circuit(circuit_t *circuit, relay_decript_t *relay_list);
 
 
 

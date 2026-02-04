@@ -74,6 +74,7 @@ void forward_messages(int last_fd, int next_fd)
                         printf("failed to write exact\n");
                         break;
                     }
+                    printf("message recieved: %s\n", buf);
                 }
                 else
                 {
@@ -92,6 +93,7 @@ void forward_messages(int last_fd, int next_fd)
                         printf("failed to write exact\n");
                         break;
                     }
+                    printf("message recieved: %s\n", buf);
                 }
                 else
                 {

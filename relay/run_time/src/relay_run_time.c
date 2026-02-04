@@ -51,11 +51,22 @@ static void relay_client_callback(user_descriptor_t* user)
             session.next_fd = -1;
             if((extend_connection(&session,&message)))
             {
-                forward_messages(session.last_fd,session.next_fd);
-                close(session.next_fd);
-                close(session.last_fd);
-                free(user);
-                return;
+                extend_ack_e ack = ACK_EXTEND_OK;
+                if(write_exact(session.last_fd, &ack, sizeof(extend_ack_e)))
+                {
+                    printf("relay_run_time: extend_connection succeeded, forwarding messages\n");
+                    forward_messages(session.last_fd,session.next_fd);
+                    close(session.next_fd);
+                    close(session.last_fd);
+                    free(user);
+                    return;
+                }
+            }
+            else
+            {
+                extend_ack_e ack = ACK_EXTEND_FAIL;
+                write_exact(session.last_fd, &ack, sizeof(extend_ack_e));
+                printf("relay_run_time: extend_connection failed\n");
             }
         }
         else if(message.header.type == TOR_MSG_DATA)

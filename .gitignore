@@ -1,4 +1,5 @@
-.*o
+**/*.o
+
 
 client_test
 dest_server_bin

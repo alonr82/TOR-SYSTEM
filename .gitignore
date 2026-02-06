@@ -1,0 +1,14 @@
+.*o
+
+client_test
+dest_server_bin
+dir_server
+relay_node
+relay_test
+tor_server
+
+dir.cfg
+serverconfig.conf
+relays.pids
+
+!makefile

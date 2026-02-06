@@ -14,12 +14,14 @@ INCLUDES = \
 	-Irelay/relay_reg/header \
 	-Irelay/run_time/header \
 	-Irelay/forward_msg/header \
-	-Iclient/create_circuit/header
+	-Iclient/create_circuit/header \
+	-Idest_server/header
 
 # ---------- Binaries ----------
 DIR_BIN    = dir_server
 RELAY_BIN  = relay_node
 CLIENT_BIN = client_test
+DEST_BIN   = dest_server_bin
 
 # ---------- Config ----------
 DIR_CFG ?= dir.cfg
@@ -52,7 +54,6 @@ SRC_RELAY = \
 	sock_utilities/src/relay_listen_tor.c \
 	sock_utilities/src/tor_in_out.c
 
-
 SRC_CLIENT = \
 	client/src/client_main.c \
 	client/create_circuit/src/create_circuit.c \
@@ -60,12 +61,19 @@ SRC_CLIENT = \
 	sock_utilities/src/connect_server.c \
 	sock_utilities/src/tor_in_out.c
 
+# NOTE: אם הקובץ אצלך לא נקרא dest_main.c, תתקן כאן לשם האמיתי
+SRC_DEST = \
+	dest_server/src/dest_server.c \
+	dest_server/src/dest_main.c \
+	sock_utilities/src/tor_in_out.c
+
 OBJ_DIR    = $(SRC_DIR:.c=.o)
 OBJ_RELAY  = $(SRC_RELAY:.c=.o)
 OBJ_CLIENT = $(SRC_CLIENT:.c=.o)
+OBJ_DEST   = $(SRC_DEST:.c=.o)
 
 # ---------- Default ----------
-all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN)
+all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN)
 
 # ---------- Build rules ----------
 $(DIR_BIN): $(OBJ_DIR)
@@ -76,6 +84,9 @@ $(RELAY_BIN): $(OBJ_RELAY)
 
 $(CLIENT_BIN): $(OBJ_CLIENT)
 	$(CC) $(CFLAGS) $(OBJ_CLIENT) -o $@ $(LDFLAGS)
+
+$(DEST_BIN): $(OBJ_DEST)
+	$(CC) $(CFLAGS) $(OBJ_DEST) -o $@ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -104,6 +115,9 @@ run_relays10: cfg $(RELAY_BIN)
 run_client: cfg $(CLIENT_BIN)
 	./$(CLIENT_BIN)
 
+run_dest: $(DEST_BIN)
+	./$(DEST_BIN)
+
 # ---------- Valgrind ----------
 valgrind_dir: cfg $(DIR_BIN)
 	valgrind $(VALGRIND_FLAGS) ./$(DIR_BIN) $(DIR_CFG)
@@ -114,6 +128,9 @@ valgrind_relay: cfg $(RELAY_BIN)
 valgrind_client: cfg $(CLIENT_BIN)
 	valgrind $(VALGRIND_FLAGS) ./$(CLIENT_BIN)
 
+valgrind_dest: $(DEST_BIN)
+	valgrind $(VALGRIND_FLAGS) ./$(DEST_BIN)
+
 # ---------- Stop relays ----------
 stop_relays:
 	@echo "Stopping relay nodes..."
@@ -122,12 +139,12 @@ stop_relays:
 # ---------- Cleanup ----------
 clean:
 	rm -f \
-		$(OBJ_DIR) $(OBJ_RELAY) $(OBJ_CLIENT) \
-		$(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) \
+		$(OBJ_DIR) $(OBJ_RELAY) $(OBJ_CLIENT) $(OBJ_DEST) \
+		$(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN) \
 		$(DIR_CFG) $(CLIENT_CFG) \
-		valgrind.relay.*.log
+		valgrind.relay.*.log valgrind.dir.*.log valgrind.client.*.log valgrind.dest.*.log
 
 .PHONY: all clean cfg \
-	run_dir run_relay run_relays10 run_client \
-	valgrind_dir valgrind_relay valgrind_client \
+	run_dir run_relay run_relays10 run_client run_dest \
+	valgrind_dir valgrind_relay valgrind_client valgrind_dest \
 	stop_relays

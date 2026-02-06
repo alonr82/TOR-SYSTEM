@@ -12,6 +12,7 @@
 #define SUCCESS 0
 #define FAILURE -1
 #define SERVER_MSG_SIZE 4096
+#define DEST_SERVER_PORT 8080
 
 
 typedef struct

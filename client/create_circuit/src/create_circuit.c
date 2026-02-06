@@ -77,7 +77,15 @@ bool connect_to_dir_server(const char *dir_cfg)
                         }
                         else
                         {
-                            printf("[client] sent DATA\n");
+                            if(tor_recv_msg(circuit.guard_fd,&data))
+                            {
+                                uint16_t payload_len = ntohs(data.header.payload_len);
+                                printf("Got message back: %.*s\n",payload_len, data.payload);
+                            }
+                            else
+                            {
+                                printf("failed to recieve\n");
+                            }
                         }
                     }
                     else

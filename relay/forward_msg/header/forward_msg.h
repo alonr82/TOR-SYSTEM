@@ -32,6 +32,13 @@ bool extend_connection(session_t *session, tor_msg_t *msg);
  * @param last_fd the one "behind" the current relay 
  * @param next_fd the one "after" the current relay
  */
-void forward_messages(int last_fd, int next_fd);
+void forward_messages(int last_fd, int next_fd, volatile bool *run_flag);
+
+/**
+ * @brief this function connects the exit relay to the dest server
+ * 
+ * @return int fd
+ */
+int connect_to_dest_server(void);
 
 #endif

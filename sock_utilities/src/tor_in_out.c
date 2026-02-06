@@ -31,31 +31,33 @@ static  bool tor_msg_valid(const tor_msg_t *message)
 
 bool read_exact(int fd, void *buf, size_t expected_size)
 {
-    bool retval = true;
     size_t offset = 0;
-    while (offset < expected_size) 
+
+    while (offset < expected_size)
     {
         ssize_t recived_bytes = recv(fd, (uint8_t*)buf + offset, expected_size - offset, 0);
+
         if (recived_bytes == 0)
         {
-            retval = false;
+            return false; 
         }
-        else if (recived_bytes < 0) 
+        if (recived_bytes < 0)
         {
             if (errno == EINTR)
             {
                 continue;
             }
-            else
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                retval = false;
+                return false;
             }
+            return false;
         }
         offset += (size_t)recived_bytes;
     }
-    return retval;
-}
 
+    return true;
+}
 
 bool write_exact(int fd, const void *buf, size_t expected_size)
 {

@@ -40,7 +40,7 @@ bool extend_connection(session_t *session, tor_msg_t *msg)
     return retval;
 }
 
-void forward_messages(int last_fd, int next_fd)
+void forward_messages(int last_fd, int next_fd, volatile bool *run_flag)
 {
     uint8_t buf[TOR_MSG_SIZE];
     struct pollfd fds[TWO_SOCKETS];
@@ -48,9 +48,10 @@ void forward_messages(int last_fd, int next_fd)
     fds[0].fd = last_fd;
     fds[1].events = POLLIN;
     fds[1].fd = next_fd;
-    while(true)
+
+    while(*run_flag)
     {
-        int poll_resualt = poll(fds, TWO_SOCKETS, -1);
+        int poll_resualt = poll(fds, TWO_SOCKETS, 50); 
         if(poll_resualt < 0)
         {
             if(errno == EINTR)
@@ -60,48 +61,78 @@ void forward_messages(int last_fd, int next_fd)
             else
             {
                 break;
-            }
+            } 
         }
-        else
+        if(poll_resualt == 0)
         {
-            if(fds[0].revents & POLLIN)
+            continue;
+        } 
+
+        if(fds[0].revents & POLLIN)
+        {
+            ssize_t bytes_recived = recv(last_fd, buf, TOR_MSG_SIZE, 0);
+            if(bytes_recived > 0)
             {
-                ssize_t bytes_recived = recv(last_fd,buf,TOR_MSG_SIZE,0);
-                if(bytes_recived > 0)
+                if(!(write_exact(next_fd, buf, bytes_recived)))
                 {
-                    if(!(write_exact(next_fd,buf,bytes_recived)))
-                    {
-                        printf("failed to write exact\n");
-                        break;
-                    }
-                    printf("message recieved: %s\n", buf);
-                }
-                else
-                {
-                    printf("bytes recived <= 0\n");
-                    printf("Line 81\n");
                     break;
-                }
+                } 
+                tor_msg_t* msg = (tor_msg_t*)buf;
+                int payload_len = ntohs(msg->header.payload_len);
+                printf("message recieved: %.*s\n", payload_len, (char*)msg->payload);
             }
-            if(fds[1].revents & POLLIN)
+            else 
             {
-                ssize_t bytes_recived = recv(next_fd,buf,TOR_MSG_SIZE,0);
-                if(bytes_recived > 0)
+                break;
+            }
+
+        }
+        
+        if(fds[1].revents & POLLIN)
+        {
+            ssize_t bytes_recived = recv(next_fd, buf, TOR_MSG_SIZE, 0);
+            if(bytes_recived > 0)
+            {
+                if(!(write_exact(last_fd, buf, bytes_recived)))
                 {
-                    if(!(write_exact(last_fd,buf,bytes_recived)))
-                    {
-                        printf("failed to write exact\n");
-                        break;
-                    }
-                    printf("message recieved: %s\n", buf);
-                }
-                else
-                {
-                    printf("bytes recived <= 0\n");
-                    printf("Line 99\n");
                     break;
-                }
+                } 
+                tor_msg_t* msg = (tor_msg_t*)buf;
+                int payload_len = ntohs(msg->header.payload_len);
+                printf("message recieved: %.*s\n", payload_len, (char*)msg->payload);
+            }
+            else 
+            {
+                break;
             }
         }
     }
+    shutdown(last_fd, SHUT_RDWR);
+    if(next_fd >= 0)
+    {
+        shutdown(next_fd, SHUT_RDWR);
+    } 
+}
+
+int connect_to_dest_server(void)
+{
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0)
+    {
+        perror("socket");
+    }
+    else
+    {
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(DEST_SERVER_PORT);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); 
+        if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+        {
+            perror("connect dest");
+            close(fd);
+        }
+    }
+    return fd;
 }

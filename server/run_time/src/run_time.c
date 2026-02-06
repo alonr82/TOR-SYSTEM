@@ -144,7 +144,6 @@ static void client_callback(user_descriptor_t* user)
             handle_send_relay(user->fd);
         }
     }
-    free(user);
     return;
 }
 

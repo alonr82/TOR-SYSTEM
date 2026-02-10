@@ -2,6 +2,9 @@ CC      = gcc
 CFLAGS  = -Wall -Wextra -pedantic -std=c11 -g
 LDFLAGS = -pthread
 
+# ---------- Crypto ----------
+CRYPTO_LIBS = -lcrypto
+
 # ---------- Includes ----------
 INCLUDES = \
 	-Icommon \
@@ -15,13 +18,15 @@ INCLUDES = \
 	-Irelay/run_time/header \
 	-Irelay/forward_msg/header \
 	-Iclient/create_circuit/header \
-	-Idest_server/header
+	-Idest_server/header \
+	-Icrypto/header
 
 # ---------- Binaries ----------
-DIR_BIN    = dir_server
-RELAY_BIN  = relay_node
-CLIENT_BIN = client_test
-DEST_BIN   = dest_server_bin
+DIR_BIN         = dir_server
+RELAY_BIN       = relay_node
+CLIENT_BIN      = client_test
+DEST_BIN        = dest_server_bin
+TEST_CRYPTO_BIN = test_crypto_bin
 
 # ---------- Config ----------
 DIR_CFG ?= dir.cfg
@@ -31,6 +36,14 @@ CLIENT_CFG     = $(CLIENT_CFG_DIR)/dir_server_config.cfg
 VALGRIND_FLAGS = --leak-check=full --show-leak-kinds=all --track-origins=yes
 
 # ---------- Sources ----------
+SRC_CRYPTO = \
+	crypto/src/tor_crypto.c
+
+# --- התיקון כאן: הוספנו את הנתיב crypto/src/ ---
+SRC_TEST_CRYPTO = \
+	crypto/src/crypto_test.c \
+	$(SRC_CRYPTO)
+
 SRC_DIR = \
 	server/src/main_test.c \
 	server/run_time/src/run_time.c \
@@ -52,16 +65,17 @@ SRC_RELAY = \
 	sock_utilities/src/connect_server.c \
 	sock_utilities/src/accept.c \
 	sock_utilities/src/relay_listen_tor.c \
-	sock_utilities/src/tor_in_out.c
+	sock_utilities/src/tor_in_out.c \
+	$(SRC_CRYPTO)
 
 SRC_CLIENT = \
 	client/src/client_main.c \
 	client/create_circuit/src/create_circuit.c \
 	common/src/dir_server_config.c \
 	sock_utilities/src/connect_server.c \
-	sock_utilities/src/tor_in_out.c
+	sock_utilities/src/tor_in_out.c \
+	$(SRC_CRYPTO)
 
-# NOTE: אם הקובץ אצלך לא נקרא dest_main.c, תתקן כאן לשם האמיתי
 SRC_DEST = \
 	dest_server/src/dest_server.c \
 	dest_server/src/dest_main.c \
@@ -73,20 +87,24 @@ OBJ_CLIENT = $(SRC_CLIENT:.c=.o)
 OBJ_DEST   = $(SRC_DEST:.c=.o)
 
 # ---------- Default ----------
-all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN)
+all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN)
 
 # ---------- Build rules ----------
 $(DIR_BIN): $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(OBJ_DIR) -o $@ $(LDFLAGS)
 
 $(RELAY_BIN): $(OBJ_RELAY)
-	$(CC) $(CFLAGS) $(OBJ_RELAY) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OBJ_RELAY) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 $(CLIENT_BIN): $(OBJ_CLIENT)
-	$(CC) $(CFLAGS) $(OBJ_CLIENT) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OBJ_CLIENT) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 $(DEST_BIN): $(OBJ_DEST)
 	$(CC) $(CFLAGS) $(OBJ_DEST) -o $@ $(LDFLAGS)
+
+# כלל בנייה מיוחד לטסט הקריפטו
+$(TEST_CRYPTO_BIN): $(SRC_TEST_CRYPTO)
+	$(CC) $(CFLAGS) $(INCLUDES) $(SRC_TEST_CRYPTO) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -118,6 +136,9 @@ run_client: cfg $(CLIENT_BIN)
 run_dest: $(DEST_BIN)
 	./$(DEST_BIN)
 
+run_crypto: $(TEST_CRYPTO_BIN)
+	./$(TEST_CRYPTO_BIN)
+
 # ---------- Valgrind ----------
 valgrind_dir: cfg $(DIR_BIN)
 	valgrind $(VALGRIND_FLAGS) ./$(DIR_BIN) $(DIR_CFG)
@@ -131,6 +152,9 @@ valgrind_client: cfg $(CLIENT_BIN)
 valgrind_dest: $(DEST_BIN)
 	valgrind $(VALGRIND_FLAGS) ./$(DEST_BIN)
 
+valgrind_crypto: $(TEST_CRYPTO_BIN)
+	valgrind $(VALGRIND_FLAGS) ./$(TEST_CRYPTO_BIN)
+
 # ---------- Stop relays ----------
 stop_relays:
 	@echo "Stopping relay nodes..."
@@ -140,11 +164,11 @@ stop_relays:
 clean:
 	rm -f \
 		$(OBJ_DIR) $(OBJ_RELAY) $(OBJ_CLIENT) $(OBJ_DEST) \
-		$(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN) \
+		$(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN) \
 		$(DIR_CFG) $(CLIENT_CFG) \
 		valgrind.relay.*.log valgrind.dir.*.log valgrind.client.*.log valgrind.dest.*.log
 
 .PHONY: all clean cfg \
-	run_dir run_relay run_relays10 run_client run_dest \
-	valgrind_dir valgrind_relay valgrind_client valgrind_dest \
+	run_dir run_relay run_relays10 run_client run_dest run_crypto \
+	valgrind_dir valgrind_relay valgrind_client valgrind_dest valgrind_crypto \
 	stop_relays

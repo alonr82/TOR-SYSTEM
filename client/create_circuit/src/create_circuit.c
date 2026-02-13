@@ -1,7 +1,6 @@
 #include "create_circuit.h"
 
 
-static bool create_circuit(relay_decript_t* relays_list, uint32_t relay_list_len);
 static void fill_circuit_relays(circuit_t *circuit, relay_decript_t *relays_list);
 
 static relay_decript_t* get_list_from_dir_server(int sock_fd, uint32_t *relays_amount)
@@ -67,24 +66,22 @@ bool connect_to_dir_server(const char *dir_cfg)
                         tor_msg_t data;
                         memset(&data, 0, sizeof(data));
                         data.header.type = TOR_MSG_DATA;
-                        const char *txt = "This is a test message through the circuit";
-                        data.header.payload_len = htons((uint16_t)strlen(txt));
-                        memcpy(data.payload, txt, strlen(txt));
-
-                        if (!tor_send_msg(circuit.guard_fd, &data))
+                        const uint8_t *txt = (const uint8_t *) "This is a test message through the circuit";
+                        uint16_t txt_len = (uint16_t)strlen((char *)txt);
+                        uint8_t key[E2E_KEY_LEN]; 
+                        uint16_t blob_len_host = 0;
+                        memset(key, 0x42, E2E_KEY_LEN);
+                        if(gen_encrypted_framed_message(txt,txt_len,key,data.payload,&blob_len_host))
                         {
-                            printf("[client] send DATA failed\n");
-                        }
-                        else
-                        {
-                            if(tor_recv_msg(circuit.guard_fd,&data))
+                            data.header.payload_len = htons(blob_len_host);
+                            printf("gen_encrypted_frame_message SUCCESS\n");
+                            if (!tor_send_msg(circuit.guard_fd, &data))
                             {
-                                uint16_t payload_len = ntohs(data.header.payload_len);
-                                printf("Got message back: %.*s\n",payload_len, data.payload);
+                                printf("[client] send DATA failed\n");
                             }
                             else
                             {
-                                printf("failed to recieve\n");
+                                printf("send data succeded\n");
                             }
                         }
                     }

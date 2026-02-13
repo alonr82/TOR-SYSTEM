@@ -128,18 +128,25 @@ bool dest_handle_message(int client_fd)
 {
     tor_msg_t message;
     memset(&message, 0, sizeof(message));
+    
     if(tor_recv_msg(client_fd, &message))
     {
         if(message.header.type == TOR_MSG_DATA)
         {
-            uint16_t payload_len = ntohs(message.header.payload_len);
-            printf("Message: %.*s\n",payload_len, message.payload);
-            char *response = "Your message received";
-            message.header.payload_len = htons(strlen(response));
-            memcpy(message.payload, response, strlen(response));
-            if(tor_send_msg(client_fd, &message))
+            uint8_t key[E2E_KEY_LEN]; 
+            memset(key, 0x42, E2E_KEY_LEN);
+            uint16_t blob_len_host = ntohs(message.header.payload_len);
+            // 1. הגדרת באפר מספיק גדול להודעה המפוענחת
+            uint8_t plaintext[sizeof(message.payload)];
+            uint16_t plaintext_len = 0;
+            // 2. שליחת המשתנים הנכונים (בלי & על המערך עצמו)
+            if(decrypt_blob(message.payload,&blob_len_host, key, plaintext, &plaintext_len))
             {
-                return true;
+                // 3. הוספת Null-terminator כדי להדפיס כסטרינג בבטחה
+                if (plaintext_len < sizeof(plaintext)) {
+                    plaintext[plaintext_len] = '\0';
+                }
+                printf("Received message: %s\n", (char*)plaintext);
             }
         }
     }

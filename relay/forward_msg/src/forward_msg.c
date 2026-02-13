@@ -77,9 +77,6 @@ void forward_messages(int last_fd, int next_fd, volatile bool *run_flag)
                 {
                     break;
                 } 
-                tor_msg_t* msg = (tor_msg_t*)buf;
-                int payload_len = ntohs(msg->header.payload_len);
-                printf("message recieved: %.*s\n", payload_len, (char*)msg->payload);
             }
             else 
             {
@@ -97,9 +94,6 @@ void forward_messages(int last_fd, int next_fd, volatile bool *run_flag)
                 {
                     break;
                 } 
-                tor_msg_t* msg = (tor_msg_t*)buf;
-                int payload_len = ntohs(msg->header.payload_len);
-                printf("message recieved: %.*s\n", payload_len, (char*)msg->payload);
             }
             else 
             {

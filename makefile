@@ -37,7 +37,8 @@ VALGRIND_FLAGS = --leak-check=full --show-leak-kinds=all --track-origins=yes
 
 # ---------- Sources ----------
 SRC_CRYPTO = \
-	crypto/src/tor_crypto.c
+	crypto/src/chacha20.c \
+	crypto/src/diffie_hellman.c
 
 # --- התיקון כאן: הוספנו את הנתיב crypto/src/ ---
 SRC_TEST_CRYPTO = \
@@ -79,7 +80,8 @@ SRC_CLIENT = \
 SRC_DEST = \
 	dest_server/src/dest_server.c \
 	dest_server/src/dest_main.c \
-	sock_utilities/src/tor_in_out.c
+	sock_utilities/src/tor_in_out.c\
+	$(SRC_CRYPTO)
 
 OBJ_DIR    = $(SRC_DIR:.c=.o)
 OBJ_RELAY  = $(SRC_RELAY:.c=.o)
@@ -100,7 +102,7 @@ $(CLIENT_BIN): $(OBJ_CLIENT)
 	$(CC) $(CFLAGS) $(OBJ_CLIENT) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 $(DEST_BIN): $(OBJ_DEST)
-	$(CC) $(CFLAGS) $(OBJ_DEST) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OBJ_DEST) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 # כלל בנייה מיוחד לטסט הקריפטו
 $(TEST_CRYPTO_BIN): $(SRC_TEST_CRYPTO)

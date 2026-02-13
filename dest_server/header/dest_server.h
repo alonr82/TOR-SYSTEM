@@ -3,6 +3,7 @@
 
 #include "tor_protocol.h"
 #include "sock_utilities.h"
+#include "tor_crypto.h"
 
 #define DEST_SERVER_PORT 8080
 #define BACKLOG_NUM 10

@@ -85,5 +85,24 @@ bool generate_empherial_keypair(uint8_t empherial_public_key[TOR_X25519_KEY_LEN]
  */
 bool derive_shared_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
     const uint8_t own_private_key[TOR_X25519_KEY_LEN], const uint8_t partner_public_key[TOR_E2E_KEY_LEN]);
+
+/**
+ * @brief this function derives a hkdf key 
+ * 
+ * @param key_derived the key generated
+ * @param key_derived_len the len of the key generated
+ * @param in_shared_secret the commom shared secret
+ * @param in_shared_secret_len the common shared secret len
+ * @param salt 
+ * @param salt_len 
+ * @param info 
+ * @param info_len 
+ * @return true 
+ * @return false 
+ */
+bool hkdf_derive_key(uint8_t* key_derived, size_t key_derived_len,
+    const uint8_t* in_shared_secret, size_t in_shared_secret_len,
+    const uint8_t* salt, size_t salt_len,
+    const uint8_t* info, size_t info_len);
     
 #endif

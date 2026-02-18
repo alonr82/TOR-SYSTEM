@@ -26,6 +26,9 @@
 #define TOR_SHARED_SECRET_LEN 32
 #define TOR_E2E_KEY_LEN 32
 #define TOR_HKDF_INFO_MAX_LEN 64
+#define TOR_ED25519_PUB_LEN 32
+#define TOR_ED25519_SEED_LEN 32
+#define TOR_ED25519_SIG_LEN 64
 
 /**
  * @brief this function prints info about openssl library functions failures
@@ -102,7 +105,41 @@ bool derive_shared_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
  */
 bool hkdf_derive_key(uint8_t* key_derived, size_t key_derived_len,
     const uint8_t* in_shared_secret, size_t in_shared_secret_len,
-    const uint8_t* salt, size_t salt_len,
-    const uint8_t* info, size_t info_len);
+    const uint8_t* salt, size_t salt_len, const uint8_t* info, size_t info_len);
+
+/**
+ * @brief this function generates a pair of ed25519 keys for identity and signing purposes
+ * 
+ * @param pub 
+ * @param priv_seed this is the seed for the private key, we use it to be able to regenerate the same private key in case we need to
+ * @return true 
+ * @return false 
+ */
+bool tor_ed25519_generate_identity_keypair(uint8_t pub[TOR_ED25519_PUB_LEN], uint8_t priv_seed[TOR_ED25519_SEED_LEN]);
+
+/**
+ * @brief this function signs a message using ed25519 signature scheme
+ * 
+ * @param sig the signature we generate
+ * @param priv_seed this is the seed for the private key, we use it to be able to regenerate the same private key in case we need to
+ * @param msg 
+ * @param msg_len 
+ * @return true 
+ * @return false 
+ */
+bool tor_ed25519_sign(uint8_t sig[TOR_ED25519_SIG_LEN], const uint8_t priv_seed[TOR_ED25519_SEED_LEN],
+    const uint8_t *msg, size_t msg_len);
     
+/**
+ * @brief this function verifies a message using ed25519 signature scheme
+ * 
+ * @param pub this is the public key of the signer, we need it to verify the signature
+ * @param sig the signature we want to verify
+ * @param msg 
+ * @param msg_len 
+ * @return true 
+ * @return false 
+ */
+bool tor_ed25519_verify(const uint8_t pub[TOR_ED25519_PUB_LEN],
+    const uint8_t sig[TOR_ED25519_SIG_LEN], const uint8_t *msg, size_t msg_len);
 #endif

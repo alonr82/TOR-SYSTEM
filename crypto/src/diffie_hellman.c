@@ -385,7 +385,7 @@ static bool hkdf_derive_process(EVP_PKEY_CTX *context, const uint8_t *salt,
                 }
                 else
                 {
-                    if (EVP_PKEY_derive(context, key_derived, *key_derived_len) != TOR_OPENSSL_OK)
+                    if (EVP_PKEY_derive(context, key_derived, key_derived_len) != TOR_OPENSSL_OK)
                     {
                         tor_crypto_print_openssl_error("EVP_PKEY_derive(HKDF)");
                         retval = false;
@@ -399,8 +399,7 @@ static bool hkdf_derive_process(EVP_PKEY_CTX *context, const uint8_t *salt,
 
 bool hkdf_derive_key(uint8_t* key_derived, size_t key_derived_len,
     const uint8_t* in_shared_secret, size_t in_shared_secret_len,
-    const uint8_t* salt, size_t salt_len,
-    const uint8_t* info, size_t info_len)
+    const uint8_t* salt, size_t salt_len, const uint8_t* info, size_t info_len)
 {
     bool retval = true;
     EVP_PKEY_CTX *context = NULL;

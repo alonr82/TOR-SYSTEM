@@ -38,7 +38,8 @@ VALGRIND_FLAGS = --leak-check=full --show-leak-kinds=all --track-origins=yes
 # ---------- Sources ----------
 SRC_CRYPTO = \
 	crypto/src/chacha20.c \
-	crypto/src/diffie_hellman.c
+	crypto/src/diffie_hellman.c \
+	crypto/src/signatures.c
 
 # --- התיקון כאן: הוספנו את הנתיב crypto/src/ ---
 SRC_TEST_CRYPTO = \

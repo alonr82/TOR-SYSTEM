@@ -199,11 +199,53 @@ bool generate_empherial_keypair(uint8_t empherial_public_key[TOR_X25519_KEY_LEN]
     return retval;
 }
 
-static bool init_context_derive_share_secret(EVP_PKEY_CTX *context, EVP_PKEY *self_private_key,
+static bool setup_derive_context(EVP_PKEY_CTX *context, EVP_PKEY *public_key_partner)
+{
+    bool retval = true;
+    
+    if(EVP_PKEY_derive_init(context) != TOR_OPENSSL_OK)
+    {
+        tor_crypto_print_openssl_error("EVP_PKEY_derive_init");
+        retval = false;
+    }
+    else
+    {
+        if(EVP_PKEY_derive_set_peer(context, public_key_partner) != TOR_OPENSSL_OK)
+        {
+            tor_crypto_print_openssl_error("EVP_PKEY_derive_set_peer");
+            retval = false;
+        }
+    }
+    
+    return retval;
+}
+
+static bool execute_derive_length(EVP_PKEY_CTX *context, size_t *shared_secret_len)
+{
+    bool retval = true;
+    
+    if(EVP_PKEY_derive(context, NULL, shared_secret_len) != TOR_OPENSSL_OK)
+    {
+        tor_crypto_print_openssl_error("EVP_PKEY_derive");
+        retval = false;
+    }
+    else
+    {
+        if(*shared_secret_len != TOR_SHARED_SECRET_LEN)
+        {
+            retval = false;
+        }
+    }
+    
+    return retval;
+}
+
+static bool init_context_derive_share_secret(EVP_PKEY_CTX **context_out, EVP_PKEY *self_private_key,
     EVP_PKEY *public_key_partner, size_t *shared_secret_len)
 {
     bool retval = true;
-    context = EVP_PKEY_CTX_new(self_private_key, NULL);
+    EVP_PKEY_CTX *context = EVP_PKEY_CTX_new(self_private_key, NULL);
+    
     if(context == NULL)
     {
         tor_crypto_print_openssl_error("EVP_PKEY_CTX_new");
@@ -211,35 +253,32 @@ static bool init_context_derive_share_secret(EVP_PKEY_CTX *context, EVP_PKEY *se
     }
     else
     {
-        if(EVP_PKEY_derive_init(context) != TOR_OPENSSL_OK)
+        if(!setup_derive_context(context, public_key_partner))
         {
-            tor_crypto_print_openssl_error("EVP_PKEY_derive_init");
             retval = false;
         }
         else
         {
-            if(EVP_PKEY_derive_set_peer(context, public_key_partner) != TOR_OPENSSL_OK)
+            if(!execute_derive_length(context, shared_secret_len))
             {
-                tor_crypto_print_openssl_error("EVP_PKEY_derive_set_peer");
                 retval = false;
             }
             else
             {
-                if(EVP_PKEY_derive(context, NULL, shared_secret_len) != TOR_OPENSSL_OK)
-                {
-                    tor_crypto_print_openssl_error("EVP_PKEY_derive");
-                    retval = false;
-                }
-                else
-                {
-                    if(*shared_secret_len != TOR_SHARED_SECRET_LEN)
-                    {
-                        retval = false;
-                    }
-                }
+                *context_out = context;
             }
         }
     }
+    
+    if (!retval)
+    {
+        if (context != NULL)
+        {
+            EVP_PKEY_CTX_free(context);
+        }
+        *context_out = NULL;
+    }
+    
     return retval;
 }
 
@@ -249,15 +288,21 @@ static bool derive_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
     bool retval = true;
     EVP_PKEY_CTX *context = NULL;
     size_t shared_secret_len = 0;
-    if(shared_secret != NULL && self_private_key != NULL && public_key_partner != NULL)
+    
+    if(shared_secret == NULL || self_private_key == NULL || public_key_partner == NULL)
     {
-        if(!init_context_derive_share_secret(context,self_private_key,public_key_partner,&shared_secret_len))
+        retval = false;
+    }
+    else
+    {
+        // העברת ה-context עם & כדי שיעודכן בפונקציה
+        if(!init_context_derive_share_secret(&context, self_private_key, public_key_partner, &shared_secret_len))
         {
             retval = false;
         }
         else
         {
-            if(EVP_PKEY_derive(context,shared_secret, &shared_secret_len) != TOR_OPENSSL_OK)
+            if(EVP_PKEY_derive(context, shared_secret, &shared_secret_len) != TOR_OPENSSL_OK)
             {
                 tor_crypto_print_openssl_error("EVP_PKEY_derive");
                 retval = false;
@@ -271,10 +316,7 @@ static bool derive_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
             }
         }
     }
-    else
-    {
-        retval = false;
-    }
+    
     free_context(context);
     return retval;
 }
@@ -286,7 +328,11 @@ bool derive_shared_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
     EVP_PKEY *private_key_self = NULL; 
     EVP_PKEY *public_key_partner = NULL;
 
-    if(shared_secret != NULL && own_private_key != NULL && partner_public_key != NULL)
+    if(shared_secret == NULL || own_private_key == NULL || partner_public_key == NULL)
+    {
+        retval = false;
+    }
+    else
     {
         if(!import_empherial_raw_private(own_private_key, &private_key_self))
         {
@@ -298,23 +344,16 @@ bool derive_shared_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
             {
                 retval = false;
             }
-        }
-        if(retval)
-        {
-            if(!derive_secret(shared_secret,private_key_self,public_key_partner))
-            {
-                retval = false;
-            }
             else
             {
-
+                if(!derive_secret(shared_secret, private_key_self, public_key_partner))
+                {
+                    retval = false;
+                }
             }
         }
     }
-    else
-    {
-        retval = false;
-    }
+    
     if(private_key_self != NULL)
     {
         EVP_PKEY_free(private_key_self);
@@ -323,6 +362,7 @@ bool derive_shared_secret(uint8_t shared_secret[TOR_SHARED_SECRET_LEN],
     {
         EVP_PKEY_free(public_key_partner);
     }
+    
     return retval;
 }
 
@@ -330,12 +370,13 @@ static bool hkdf_optional_init(const uint8_t *salt, size_t *salt_len,
     const uint8_t *info, size_t *info_len, EVP_PKEY_CTX *context)
 {
     bool retval = true;
+    
     if (salt != NULL && *salt_len > 0)
     {
         if (EVP_PKEY_CTX_set1_hkdf_salt(context, salt, (int)*salt_len) != TOR_OPENSSL_OK)
         {
             tor_crypto_print_openssl_error("EVP_PKEY_CTX_set1_hkdf_salt");
-            retval = false;;
+            retval = false;
         }
     }
     else
@@ -345,19 +386,62 @@ static bool hkdf_optional_init(const uint8_t *salt, size_t *salt_len,
             if (EVP_PKEY_CTX_add1_hkdf_info(context, info, (int)*info_len) != TOR_OPENSSL_OK)
             {
                 tor_crypto_print_openssl_error("EVP_PKEY_CTX_add1_hkdf_info");
-                retval = 0;
+                retval = false;
             }
         }
     }
+    
+    return retval;
+}
+
+static bool hkdf_set_md_and_info(EVP_PKEY_CTX *context, const uint8_t *salt, size_t *salt_len, const uint8_t *info, size_t *info_len)
+{
+    bool retval = true;
+    
+    if(EVP_PKEY_CTX_set_hkdf_md(context, EVP_sha256()) != TOR_OPENSSL_OK)
+    {
+        tor_crypto_print_openssl_error("EVP_PKEY_CTX_set_hkdf_md");
+        retval = false;
+    }
+    else
+    {
+        if(!hkdf_optional_init(salt, salt_len, info, info_len, context))
+        {
+            retval = false;
+        }
+    }
+    
+    return retval;
+}
+
+static bool hkdf_set_key_and_derive(EVP_PKEY_CTX *context, const uint8_t *in_shared_secret, size_t *in_shared_secret_len, uint8_t *key_derived, size_t *key_derived_len)
+{
+    bool retval = true;
+    
+    if (EVP_PKEY_CTX_set1_hkdf_key(context, in_shared_secret, (int)*in_shared_secret_len) != TOR_OPENSSL_OK)
+    {
+        tor_crypto_print_openssl_error("EVP_PKEY_CTX_set1_hkdf_key");
+        retval = false;
+    }
+    else
+    {
+        if (EVP_PKEY_derive(context, key_derived, key_derived_len) != TOR_OPENSSL_OK)
+        {
+            tor_crypto_print_openssl_error("EVP_PKEY_derive(HKDF)");
+            retval = false;
+        }
+    }
+    
     return retval;
 }
 
 static bool hkdf_derive_process(EVP_PKEY_CTX *context, const uint8_t *salt,
     size_t *salt_len, const uint8_t *info, size_t *info_len, 
-    const uint8_t *in_shared_secret, size_t  *in_shared_secret_len, 
+    const uint8_t *in_shared_secret, size_t *in_shared_secret_len, 
     uint8_t *key_derived, size_t *key_derived_len)
 {
     bool retval = true;
+    
     if(EVP_PKEY_derive_init(context) != TOR_OPENSSL_OK)
     {
         tor_crypto_print_openssl_error("EVP_PKEY_derive_init");
@@ -365,35 +449,19 @@ static bool hkdf_derive_process(EVP_PKEY_CTX *context, const uint8_t *salt,
     }
     else
     {
-        if(EVP_PKEY_CTX_set_hkdf_md(context, EVP_sha256()) != TOR_OPENSSL_OK)
+        if(!hkdf_set_md_and_info(context, salt, salt_len, info, info_len))
         {
-            tor_crypto_print_openssl_error("EVP_PKEY_CTX_set_hkdf_md");
             retval = false;
         }
         else
         {
-            if(!hkdf_optional_init(salt, salt_len, info, info_len, context))
+            if(!hkdf_set_key_and_derive(context, in_shared_secret, in_shared_secret_len, key_derived, key_derived_len))
             {
                 retval = false;
             }
-            else
-            {
-                if (EVP_PKEY_CTX_set1_hkdf_key(context, in_shared_secret, (int)*in_shared_secret_len) != TOR_OPENSSL_OK)
-                {
-                    tor_crypto_print_openssl_error("EVP_PKEY_CTX_set1_hkdf_key");
-                    retval = false;
-                }
-                else
-                {
-                    if (EVP_PKEY_derive(context, key_derived, key_derived_len) != TOR_OPENSSL_OK)
-                    {
-                        tor_crypto_print_openssl_error("EVP_PKEY_derive(HKDF)");
-                        retval = false;
-                    }
-                }
-            }
         }
     }
+    
     return retval;
 }
 
@@ -402,22 +470,23 @@ bool hkdf_derive_key(uint8_t* key_derived, size_t key_derived_len,
     const uint8_t* salt, size_t salt_len, const uint8_t* info, size_t info_len)
 {
     bool retval = true;
-    EVP_PKEY_CTX *context = NULL;
-    context = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
-    if(context != NULL)
+    EVP_PKEY_CTX *context = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
+    
+    if(context == NULL)
     {
-        if(!hkdf_derive_process(context,salt,&salt_len,info,&info_len,
+        tor_crypto_print_openssl_error("EVP_PKEY_CTX_new_id");
+        retval = false;
+    }
+    else
+    {
+        if(!hkdf_derive_process(context, salt, &salt_len, info, &info_len,
                                 in_shared_secret, &in_shared_secret_len, 
                                 key_derived, &key_derived_len))
         {
             retval = false;
         }
     }
-    else
-    {
-        tor_crypto_print_openssl_error("EVP_PKEY_CTX_new_id");
-        retval = false;
-    }
+    
     free_context(context);
     return retval;
 }

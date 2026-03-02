@@ -13,6 +13,7 @@
 #define FAILURE -1
 #define SERVER_MSG_SIZE 4096
 #define DEST_SERVER_PORT 8080
+#define PUB_LEN 32
 
 
 typedef struct
@@ -22,6 +23,7 @@ typedef struct
     uint8_t ip_type;
     uint16_t relay_port;
     bool is_active;
+    uint8_t identify_pub[PUB_LEN];
 }relay_decript_t;
 
 typedef struct 

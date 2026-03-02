@@ -29,6 +29,9 @@
 #define TOR_ED25519_PUB_LEN 32
 #define TOR_ED25519_SEED_LEN 32
 #define TOR_ED25519_SIG_LEN 64
+#define TOR_ID_PUB_LEN 32
+#define TOR_DH_PUB_LEN 32
+#define TOR_SIG_LEN 64
 
 /**
  * @brief this function prints info about openssl library functions failures

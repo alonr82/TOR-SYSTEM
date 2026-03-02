@@ -16,6 +16,7 @@
                 "${workspaceFolder}/relay/forward_msg/header",
                 "${workspaceFolder}/dest_server/header",
                 "${workspaceFolder}/crypto/header",
+                "${workspaceFolder}/client/client_run/header",
                 "/usr/include/node"
             ],
             "compilerPath": "/usr/bin/gcc",

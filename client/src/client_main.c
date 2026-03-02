@@ -1,19 +1,13 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#define _POSIX_C_SOURCE 200112L
 
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
+#include "client_run.h"
 
-#include "tor_protocol.h"   // נמצא ב-common, וה-INCLUDES כבר כולל -Icommon
-#include "create_circuit.h"
-
-
-int main(int argc, char *argv[])
+int main(void)
 {
-    connect_to_dir_server("config/dir_server_config.cfg");
-    return 0;
+    int retval = EXIT_SUCCESS;
+    
+    retval = start_client_application();
+    
+    return retval;
 }

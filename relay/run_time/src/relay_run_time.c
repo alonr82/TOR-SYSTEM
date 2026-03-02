@@ -1,13 +1,15 @@
-// חובה להוסיף את השורה הזו ראשונה כדי למנוע את האזהרה על usleep
 #define _DEFAULT_SOURCE 
 
 #include "relay_run_time.h"
-#include <unistd.h> // בשביל usleep
+#include <unistd.h> 
 
 static int relay_listen_fd = -1;
 static relay_req_res_t* relay_signup_response;
 static volatile bool relay_running = true;
 static pthread_t accept_thread;
+
+uint8_t g_relay_identity_pub[TOR_ED25519_PUB_LEN];
+uint8_t g_relay_identity_priv_seed[TOR_ED25519_SEED_LEN];
 
 static void relay_run_commands(void)
 {
@@ -15,8 +17,7 @@ static void relay_run_commands(void)
 
     while (relay_running)
     {
-        // שימוש ב-select כדי לא לחסום את ה-fgets לנצח
-        struct timeval tv = {0, 500000}; // 0.5 שניות
+        struct timeval tv = {0, 500000}; 
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(STDIN_FILENO, &fds);
@@ -48,66 +49,56 @@ static void relay_client_callback(user_descriptor_t* user)
 {
     tor_msg_t message;
     
-    // אם הריליי בתהליך סגירה, לא נקבל הודעות חדשות
-    if(!relay_running) {
+    printf("\n>>> RELAY: Accepted new connection on FD %d\n", user->fd);
+
+    if(!relay_running) 
+    {
+        printf("RELAY: Shutting down, dropping connection.\n");
         close(user->fd);
         return;
     }
 
     if(tor_recv_msg(user->fd, &message) != true)
     {
+        printf("RELAY: tor_recv_msg failed! Closing connection on FD %d\n", user->fd);
         close(user->fd);
         return;
     }
     
-    if(message.header.type == TOR_MSG_EXTEND)
+    printf("RELAY: Successfully received message type: %d\n", message.header.type);
+    
+    if(message.header.type == TOR_MSG_CREATE)
     {
         session_t session;
+        memset(&session, 0, sizeof(session_t));
         session.last_fd = user->fd;
         session.next_fd = -1;
-        if((extend_connection(&session,&message)))
+        
+        tor_msg_t reply_msg;
+        memset(&reply_msg, 0, sizeof(reply_msg));
+        
+        if(process_create_handshake(&session, &message, &reply_msg, g_relay_identity_priv_seed))
         {
-            extend_ack_e ack = ACK_EXTEND_OK;
-            if(write_exact(session.last_fd, &ack, sizeof(extend_ack_e)))
+            if(tor_send_msg(session.last_fd, &reply_msg))
             {
-                printf("relay_run_time: extend_connection succeeded, forwarding messages\n");
-                // מעבירים את הפוינטר לדגל הגלובלי
-                forward_messages(session.last_fd, session.next_fd, &relay_running);
-                
-                close(session.next_fd);
-                close(session.last_fd);
-                return;
+                printf("relay_run_time: handshake succeeded, forwarding messages\n");
+                forward_messages(&session, &relay_running);
+            }
+            else
+            {
+                printf("relay_run_time: failed to send CREATED reply\n");
             }
         }
         else
         {
-            extend_ack_e ack = ACK_EXTEND_FAIL;
-            write_exact(session.last_fd, &ack, sizeof(extend_ack_e));
-            printf("relay_run_time: extend_connection failed\n");
-        }
-    }
-    else if(message.header.type == TOR_MSG_DATA)
-    {
-        int dest_fd = connect_to_dest_server();
-        if(dest_fd < 0)
-        {
-            printf("relay_run_time: failed to connect to destination server\n");
-            close(user->fd);
-            return;
-        }
-        else
-        {
-            tor_send_msg(dest_fd, &message);
-            forward_messages(user->fd, dest_fd, &relay_running);
-            close(dest_fd);
-            close(user->fd);
-            return;
+            printf("relay_run_time: process_create_handshake failed\n");
         }
     }
     else
     {
-        printf("relay_run_time: recieved UNKNOWN message type from client\n");
+        printf("relay_run_time: recieved UNEXPECTED message type from client (expected CREATE)\n");
     }
+    
     close(user->fd);
 }
 
@@ -122,29 +113,39 @@ bool run_relay(const char * dir_cfg_path)
 {
     bool retval = true;
     relay_req_res_t * signup_response = NULL;
-    signup_response = relay_connect_only(dir_cfg_path, &relay_listen_fd);
     
-    if(signup_response == NULL)
+    if(!tor_ed25519_generate_identity_keypair(g_relay_identity_pub, g_relay_identity_priv_seed))
     {
+        printf("relay_run_time: failed to generate ed25519 identity keypair\n");
         retval = false;
-        printf("relay_run_time: failed to sign up relay with directory server\n");
     }
-    else
+    
+    if(retval)
     {
-        relay_signup_response = signup_response;
-        if(pthread_create(&accept_thread, NULL, relay_accept_loop_func, NULL) != SUCCESS)
+        signup_response = relay_connect_only(dir_cfg_path, &relay_listen_fd, g_relay_identity_pub);
+        
+        if(signup_response == NULL)
         {
-            printf("relay_run_time: failed to create accept loop thread\n");
             retval = false;
+            printf("relay_run_time: failed to sign up relay with directory server\n");
         }
         else
         {
-            printf("relay_run_time: relay is running and accepting connections\n");
-            relay_run_commands(); 
-            pthread_join(accept_thread,NULL);
-            relay_connect_signout(dir_cfg_path, &signup_response->responese_details_u.signup_response);
+            relay_signup_response = signup_response;
+            if(pthread_create(&accept_thread, NULL, relay_accept_loop_func, NULL) != SUCCESS)
+            {
+                printf("relay_run_time: failed to create accept loop thread\n");
+                retval = false;
+            }
+            else
+            {
+                printf("relay_run_time: relay is running and accepting connections\n");
+                relay_run_commands(); 
+                pthread_join(accept_thread,NULL);
+                relay_connect_signout(dir_cfg_path, &signup_response->responese_details_u.signup_response);
+            }
+            free(signup_response);
         }
-        free(signup_response);
     }
     return retval;
 }

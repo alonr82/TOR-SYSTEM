@@ -2,6 +2,7 @@
 #define RELAY_MANAGER_H
 
 #include "common.h"
+#include "tor_crypto.h"
 
 typedef enum 
 {

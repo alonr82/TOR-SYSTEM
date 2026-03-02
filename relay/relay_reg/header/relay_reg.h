@@ -17,7 +17,7 @@
  * @param relay_sock_fd this will be set to the listening socket fd for the relay
  * @return relay_req_res_t* 
  */
-relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd);
+relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd, const uint8_t identity_pub[TOR_ID_PUB_LEN]);
 
 /**
  * @brief this function connects to the directory server and signs out the relay

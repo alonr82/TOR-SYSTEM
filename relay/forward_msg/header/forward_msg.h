@@ -1,44 +1,39 @@
 #ifndef FORWARD_MSG_H
 #define FORWARD_MSG_H
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <poll.h>
+#include <errno.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 #include "tor_protocol.h"
 #include "sock_utilities.h"
 
 #define TWO_SOCKETS 2
 
-typedef struct
-{
+typedef struct {
     int last_fd;
     int next_fd;
-}session_t;
+    bool hop_key_ready;
 
-/**
- * @brief this function connets the relay to the next dest and saves the fd
- * 
- * @param session struct that include both fds
- * @param msg the message we recived
- * @return true 
- * @return false 
- */
-bool extend_connection(session_t *session, tor_msg_t *msg);
+    bool dest_ready;
+    uint32_t dest_ip_v4;    /* network byte order */
+    uint16_t dest_port;     /* network byte order */
 
-/**
- * @brief this function responsible for moving the data between
- * the sockets
- * 
- * @param last_fd the one "behind" the current relay 
- * @param next_fd the one "after" the current relay
- */
-void forward_messages(int last_fd, int next_fd, volatile bool *run_flag);
+    uint8_t hop_key[E2E_KEY_LEN];
+} session_t;
 
-/**
- * @brief this function connects the exit relay to the dest server
- * 
- * @return int fd
+bool process_create_handshake(session_t *session, tor_msg_t *in_msg, tor_msg_t *out_msg, const uint8_t *priv_seed);
+
+void forward_messages(session_t *session, volatile bool *run_flag);
+
+/*
+ * connect to peer (client) by ip/port (network byte order)
  */
-int connect_to_dest_server(void);
+int connect_to_peer(uint32_t ip_v4_nbo, uint16_t port_nbo);
 
 #endif

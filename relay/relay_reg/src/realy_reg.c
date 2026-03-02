@@ -1,7 +1,7 @@
 #include "relay_reg.h"
 
 
-relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd)
+relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd, const uint8_t identity_pub[TOR_ID_PUB_LEN])
 {
     relay_req_res_t* retval = calloc(1, sizeof(relay_req_res_t));
     if(retval != NULL)
@@ -37,6 +37,8 @@ relay_req_res_t* relay_connect_only(const char* dir_cfg_path, int *relay_sock_fd
                 }
                 else
                 {
+                    memcpy(req.request_u.relay_req.request_details_u.signup_request.identify_pub,
+                            identity_pub, TOR_ID_PUB_LEN);
                     if (write_exact(sock_fd, &req, sizeof(request_t)) == false)
                     {
                         printf("relay: send FAIL\n");

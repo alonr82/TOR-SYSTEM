@@ -71,6 +71,9 @@ relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_req_t* request
         memcpy(retval->relay_ip, &addr_in->sin_addr, IP4_SIZE);
         retval->relay_port = request->request_details_u.signup_request.relay_port;
         retval->is_active = true;
+        memcpy(retval->identify_pub, 
+            request->request_details_u.signup_request.identify_pub, TOR_ID_PUB_LEN);
+
     }
     return retval;
 }

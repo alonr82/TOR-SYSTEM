@@ -8,7 +8,7 @@
 #include "run_time.h"
 #include "relay_manager.h"
 #include <pthread.h>
-#include "common.h"
+#include "tor_protocol.h"
 
 #define MAX_RELAY_BATCH_SIZE 10
 #define INPUT_SIZE 256

@@ -18,6 +18,9 @@ INCLUDES = \
 	-Irelay/run_time/header \
 	-Irelay/forward_msg/header \
 	-Iclient/create_circuit/header \
+	-Iclient/header \
+	-Iclient/client_run \
+	-Iclient/client_run/header \
 	-Idest_server/header \
 	-Icrypto/header
 
@@ -41,7 +44,6 @@ SRC_CRYPTO = \
 	crypto/src/diffie_hellman.c \
 	crypto/src/signatures.c
 
-# --- התיקון כאן: הוספנו את הנתיב crypto/src/ ---
 SRC_TEST_CRYPTO = \
 	crypto/src/crypto_test.c \
 	$(SRC_CRYPTO)
@@ -70,8 +72,10 @@ SRC_RELAY = \
 	sock_utilities/src/tor_in_out.c \
 	$(SRC_CRYPTO)
 
+# --- כאן תיקנו את הנתיב ל-src/client_run.c ---
 SRC_CLIENT = \
 	client/src/client_main.c \
+	client/client_run/src/client_run.c \
 	client/create_circuit/src/create_circuit.c \
 	common/src/dir_server_config.c \
 	sock_utilities/src/connect_server.c \

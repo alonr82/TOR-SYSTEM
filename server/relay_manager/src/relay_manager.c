@@ -145,6 +145,10 @@ relay_data_t* generate_relay(relay_decript_t *relay_info)
         items[max_item_index].data->descriptor.relay_port = relay_info->relay_port;
         items[max_item_index].data->descriptor.ip_type = relay_info->ip_type;
         fetch_ip_address(items[max_item_index].data->descriptor.relay_ip, relay_info->relay_ip, relay_info->ip_type);
+        
+        // התיקון: מעתיקים את המפתח הציבורי למאגר של השרת
+        memcpy(items[max_item_index].data->descriptor.identify_pub, relay_info->identify_pub, TOR_ID_PUB_LEN);
+        
         retval = items[max_item_index++].data;
         pthread_mutex_unlock(&relay_manager_lock);
     }
@@ -159,6 +163,10 @@ relay_data_t* generate_relay(relay_decript_t *relay_info)
         items[used_id].data->descriptor.relay_port = relay_info->relay_port;
         items[used_id].data->descriptor.ip_type = relay_info->ip_type;
         fetch_ip_address(items[used_id].data->descriptor.relay_ip, relay_info->relay_ip, relay_info->ip_type);
+        
+        // התיקון: מעתיקים את המפתח הציבורי גם במקרה של שימוש חוזר ב-ID
+        memcpy(items[used_id].data->descriptor.identify_pub, relay_info->identify_pub, TOR_ID_PUB_LEN);
+        
         items[used_id].exists = true;
         retval = items[used_id].data;
         pthread_mutex_unlock(&relay_manager_lock);

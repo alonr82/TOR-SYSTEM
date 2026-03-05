@@ -1,19 +1,18 @@
 #include "relay_manager.h"
 #include <pthread.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define MIN_NUM_OF_RELAYS 3
 #define STACK_RELAY_MIN_LEN 1
 
 static bool initialized = false;
-
 static uint32_t items_length;
 static relay_data_item_t* items;
 static uint32_t max_item_index;
 static uint32_t stack_length;
 static uint32_t* removed_id_stack; 
 static uint32_t max_stack_index;
-
 static pthread_mutex_t relay_manager_lock = PTHREAD_MUTEX_INITIALIZER;
 
 status_init_e init_relay_manager()
@@ -113,7 +112,6 @@ bool fetch_ip_address(uint8_t* dest, uint8_t* src, uint8_t ip_type)
     return retval;
 }
 
-
 relay_data_t* generate_relay(relay_decript_t *relay_info)
 {
     relay_data_t* retval = NULL;
@@ -129,7 +127,6 @@ relay_data_t* generate_relay(relay_decript_t *relay_info)
             {
                 memset(new_items + old_length, 0, (items_length - old_length) * sizeof(relay_data_item_t));
                 items = new_items;
-
             }
             else
             {
@@ -144,9 +141,8 @@ relay_data_t* generate_relay(relay_decript_t *relay_info)
         items[max_item_index].exists = true;
         items[max_item_index].data->descriptor.relay_port = relay_info->relay_port;
         items[max_item_index].data->descriptor.ip_type = relay_info->ip_type;
+        items[max_item_index].data->descriptor.assigned_count = 0; 
         fetch_ip_address(items[max_item_index].data->descriptor.relay_ip, relay_info->relay_ip, relay_info->ip_type);
-        
-        // התיקון: מעתיקים את המפתח הציבורי למאגר של השרת
         memcpy(items[max_item_index].data->descriptor.identify_pub, relay_info->identify_pub, TOR_ID_PUB_LEN);
         
         retval = items[max_item_index++].data;
@@ -162,9 +158,8 @@ relay_data_t* generate_relay(relay_decript_t *relay_info)
         items[used_id].data->descriptor.relay_id = used_id;
         items[used_id].data->descriptor.relay_port = relay_info->relay_port;
         items[used_id].data->descriptor.ip_type = relay_info->ip_type;
+        items[used_id].data->descriptor.assigned_count = 0; 
         fetch_ip_address(items[used_id].data->descriptor.relay_ip, relay_info->relay_ip, relay_info->ip_type);
-        
-        // התיקון: מעתיקים את המפתח הציבורי גם במקרה של שימוש חוזר ב-ID
         memcpy(items[used_id].data->descriptor.identify_pub, relay_info->identify_pub, TOR_ID_PUB_LEN);
         
         items[used_id].exists = true;
@@ -173,6 +168,7 @@ relay_data_t* generate_relay(relay_decript_t *relay_info)
     }
     return retval;
 }
+
 bool remove_relay(uint32_t relay_id)
 {
     bool retval = false;
@@ -209,22 +205,59 @@ bool remove_relay(uint32_t relay_id)
     return retval; 
 }
 
+static int compare_relays(const void *a, const void *b) 
+{
+    relay_data_item_t *ra = *(relay_data_item_t **)a;
+    relay_data_item_t *rb = *(relay_data_item_t **)b;
+    if (ra->data->descriptor.assigned_count < rb->data->descriptor.assigned_count) return -1;
+    if (ra->data->descriptor.assigned_count > rb->data->descriptor.assigned_count) return 1;
+    return 0;
+}
+
 uint32_t get_relay_batch(relay_decript_t* out, uint32_t* start, uint32_t max) 
 {
     pthread_mutex_lock(&relay_manager_lock);
     uint32_t found = 0;
-    uint32_t index = *start % items_length;
-    uint32_t count = 0;
-    while (found < max && count < items_length) 
+    
+    relay_data_item_t **active_relays = malloc(items_length * sizeof(relay_data_item_t*));
+    uint32_t active_count = 0;
+    
+    if (active_relays != NULL)
     {
-        if (items[index].exists) 
+        for (uint32_t i = 0; i < items_length; i++) 
         {
-            memcpy(&out[found++], &items[index].data->descriptor, sizeof(relay_decript_t));
+            if (items[i].exists) 
+            {
+                active_relays[active_count++] = &items[i];
+            }
         }
-        index = (index + 1) % items_length;
-        count++;
+
+        if (active_count > 0) 
+        {
+            qsort(active_relays, active_count, sizeof(relay_data_item_t*), compare_relays);
+        }
+
+        /* התיקון: אנחנו לא נוגעים יותר בעומס כאן! רק שואבים נתונים */
+        for (uint32_t i = 0; i < active_count && i < max; i++) 
+        {
+            memcpy(&out[found], &active_relays[i]->data->descriptor, sizeof(relay_decript_t));
+            found++;
+        }
+        free(active_relays);
     }
-    *start = index;
+    *start = 0; 
     pthread_mutex_unlock(&relay_manager_lock);
     return found;
+}
+
+void update_relays_load(uint32_t id1, uint32_t id2, uint32_t id3)
+{
+    pthread_mutex_lock(&relay_manager_lock);
+    if (initialized) 
+    {
+        if (id1 < items_length && items[id1].exists) items[id1].data->descriptor.assigned_count++;
+        if (id2 < items_length && items[id2].exists) items[id2].data->descriptor.assigned_count++;
+        if (id3 < items_length && items[id3].exists) items[id3].data->descriptor.assigned_count++;
+    }
+    pthread_mutex_unlock(&relay_manager_lock);
 }

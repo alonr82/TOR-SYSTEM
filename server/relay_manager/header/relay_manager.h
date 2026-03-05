@@ -1,8 +1,15 @@
 #ifndef RELAY_MANAGER_H
 #define RELAY_MANAGER_H
 
+#include <pthread.h>
+#include <string.h>
+#include <stdlib.h>
 #include "common.h"
 #include "tor_crypto.h"
+
+#define MIN_NUM_OF_RELAYS 3
+#define STACK_RELAY_MIN_LEN 1
+
 
 typedef enum 
 {
@@ -81,5 +88,7 @@ uint32_t get_relay_batch(relay_decript_t *output, uint32_t* start_point, uint32_
  * @return false 
  */
 bool fetch_ip_address(uint8_t* dest, uint8_t* src, uint8_t ip_type);
+
+void update_relays_load(uint32_t id1, uint32_t id2, uint32_t id3);
 
 #endif

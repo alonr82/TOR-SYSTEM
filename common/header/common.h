@@ -24,6 +24,7 @@ typedef struct
     uint16_t relay_port;
     bool is_active;
     uint8_t identify_pub[PUB_LEN];
+    uint32_t assigned_count;
 }relay_decript_t;
 
 typedef struct 

@@ -24,12 +24,17 @@ bool send_onion_data(circuit_t *circuit, const uint8_t *plaintext, uint16_t plai
 
 bool recv_onion_data(circuit_t *circuit, tor_msg_t *in_msg, uint8_t *out_plaintext, uint16_t *out_len);
 
-/* ===== new APIs used by client_main.c ===== */
+/* ===== new APIs used by client_main.c / client_run.c ===== */
 
 /*
- * Builds circuit using directory config file, returns ready circuit.
+ * Fetches the list of active relays from the directory server.
  */
-bool build_circuit_from_dir(const char *dir_cfg, circuit_t *out_circuit);
+relay_decript_t* fetch_relays_from_dir(const char *dir_cfg, uint32_t *out_amount);
+
+/*
+ * Builds a circuit using a specific chosen list of relays.
+ */
+bool build_circuit_with_relays(circuit_t *out_circuit, relay_decript_t *chosen_relays);
 
 /*
  * Sends a KEYX message (plain) to peer through exit routing envelope.
@@ -38,7 +43,8 @@ bool build_circuit_from_dir(const char *dir_cfg, circuit_t *out_circuit);
 bool chat_send_keyx(circuit_t *circuit,
                     uint32_t peer_ip_v4_nbo,
                     uint16_t peer_port_nbo,
-                    const uint8_t key[E2E_KEY_LEN]);
+                    const uint8_t key[E2E_KEY_LEN],
+                    const uint8_t my_identity[32]);
 
 /*
  * Encrypts plaintext with e2e_key into inner DATA, wraps with routing envelope and sends through onion.
@@ -49,5 +55,7 @@ bool chat_send_encrypted(circuit_t *circuit,
                          const uint8_t e2e_key[E2E_KEY_LEN],
                          const uint8_t *plaintext,
                          uint16_t plaintext_len);
+
+void notify_directory_of_route(const char *dir_cfg, uint32_t id1, uint32_t id2, uint32_t id3);
 
 #endif

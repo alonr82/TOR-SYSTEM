@@ -167,8 +167,6 @@ bool recv_onion_data(circuit_t *circuit, tor_msg_t *in_msg, uint8_t *out_plainte
     return retval;
 }
 
-/* ===== handshake hops (כמו אצלך, נשמר סגנון) ===== */
-
 static bool derive_and_save_keys(circuit_t *circuit, const uint8_t client_ephemeral_priv[TOR_X25519_KEY_LEN], const uint8_t relay_pub[TOR_X25519_KEY_LEN])
 {
     bool retval = true;
@@ -431,8 +429,6 @@ bool build_default_circuit(circuit_t *circuit, relay_decript_t *relay_list)
     return retval;
 }
 
-/* ===== routing envelope builders (to exit->peer) ===== */
-
 static bool send_routed_inner(circuit_t *circuit,
                              uint32_t peer_ip_v4_nbo,
                              uint16_t peer_port_nbo,
@@ -467,7 +463,8 @@ static bool send_routed_inner(circuit_t *circuit,
 bool chat_send_keyx(circuit_t *circuit,
                     uint32_t peer_ip_v4_nbo,
                     uint16_t peer_port_nbo,
-                    const uint8_t key[E2E_KEY_LEN])
+                    const uint8_t key[E2E_KEY_LEN],
+                    const uint8_t my_identity[32])
 {
     bool retval = true;
 
@@ -475,14 +472,15 @@ bool chat_send_keyx(circuit_t *circuit,
     memset(&inner, 0, sizeof(inner));
     inner.header.type = TOR_MSG_DATA;
 
-    /* payload: "KEYX" + 32 bytes */
     uint8_t *p = inner.payload;
     memcpy(p, "KEYX", 4);
     memcpy(p + 4, key, E2E_KEY_LEN);
+    memcpy(p + 4 + E2E_KEY_LEN, my_identity, 32);
 
-    inner.header.payload_len = htons((uint16_t)(4 + E2E_KEY_LEN));
+    uint16_t payload_len = 4 + E2E_KEY_LEN + 32;
+    inner.header.payload_len = htons(payload_len);
 
-    uint16_t inner_len = (uint16_t)(sizeof(tor_header_t) + (4 + E2E_KEY_LEN));
+    uint16_t inner_len = (uint16_t)(sizeof(tor_header_t) + payload_len);
 
     if(!send_routed_inner(circuit, peer_ip_v4_nbo, peer_port_nbo, (const uint8_t*)&inner, inner_len))
     {
@@ -527,69 +525,66 @@ bool chat_send_encrypted(circuit_t *circuit,
     return retval;
 }
 
-/* ===== directory wrapper ===== */
-
-bool build_circuit_from_dir(const char *dir_cfg, circuit_t *out_circuit)
+relay_decript_t* fetch_relays_from_dir(const char *dir_cfg, uint32_t *out_amount)
 {
-    bool retval = true;
-
+    relay_decript_t *relay_list = NULL;
     server_config_metadata_t *cfg = fetch_server_config((char*)dir_cfg);
-    if(cfg == NULL)
-    {
-        retval = false;
-    }
-    else
+    
+    if(cfg != NULL)
     {
         int sock_fd = connect_server(cfg);
-        if(sock_fd < 0)
-        {
-            retval = false;
-        }
-        else
+        if(sock_fd >= 0)
         {
             request_t request_to_dir;
             memset(&request_to_dir, 0, sizeof(request_t));
             request_to_dir.request_type = CLIENT_REQUEST;
 
-            if(write_exact(sock_fd, &request_to_dir, sizeof(request_t)) == false)
+            if(write_exact(sock_fd, &request_to_dir, sizeof(request_t)) == true)
             {
-                retval = false;
+                relay_list = get_list_from_dir_server(sock_fd, out_amount);
             }
-            else
-            {
-                uint32_t relays_amount = 0;
-                relay_decript_t* relay_list = get_list_from_dir_server(sock_fd, &relays_amount);
-
-                if(relay_list == NULL)
-                {
-                    retval = false;
-                }
-                else
-                {
-                    memset(out_circuit, 0, sizeof(*out_circuit));
-                    fill_circuit_relays(out_circuit, relay_list);
-
-                    if(!build_default_circuit(out_circuit, relay_list))
-                    {
-                        retval = false;
-                    }
-
-                    free(relay_list);
-                }
-            }
-
             close(sock_fd);
         }
-
         free(cfg);
     }
-
-    return retval;
+    return relay_list;
 }
 
-/* keep old API (unused now) */
+bool build_circuit_with_relays(circuit_t *out_circuit, relay_decript_t *chosen_relays)
+{
+    memset(out_circuit, 0, sizeof(*out_circuit));
+    fill_circuit_relays(out_circuit, chosen_relays);
+    return build_default_circuit(out_circuit, chosen_relays);
+}
+
+void notify_directory_of_route(const char *dir_cfg, uint32_t id1, uint32_t id2, uint32_t id3)
+{
+    server_config_metadata_t *cfg = fetch_server_config((char*)dir_cfg);
+    if(cfg != NULL)
+    {
+        int sock_fd = connect_server(cfg);
+        if(sock_fd >= 0)
+        {
+            request_t req;
+            memset(&req, 0, sizeof(request_t));
+            req.request_type = CLIENT_ROUTE_SELECTED;
+            req.request_u.create_circuit_req.guard_index = id1;
+            req.request_u.create_circuit_req.middle_index = id2;
+            req.request_u.create_circuit_req.exit_index = id3;
+            write_exact(sock_fd, &req, sizeof(request_t));
+            close(sock_fd);
+        }
+        free(cfg);
+    }
+}
+
 bool connect_to_dir_server(const char *dir_cfg)
 {
     circuit_t c;
-    return build_circuit_from_dir(dir_cfg, &c);
+    uint32_t amount = 0;
+    relay_decript_t* relays = fetch_relays_from_dir(dir_cfg, &amount);
+    if (!relays) return false;
+    bool res = build_circuit_with_relays(&c, relays);
+    free(relays);
+    return res;
 }

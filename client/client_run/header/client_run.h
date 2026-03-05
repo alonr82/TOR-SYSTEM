@@ -24,6 +24,9 @@
 
 #define CMD_QUIT "/quit"
 #define CMD_CLIENTS "/clients"
+#define CMD_CHATS "/chats"
+#define CMD_HISTORY_PREFIX "/history "
+#define CMD_HISTORY_PREFIX_LEN 9
 #define CMD_SEND_PREFIX "/send "
 #define CMD_SEND_PREFIX_LEN 6
 #define CMD_CONNECT_PREFIX "/connect "
@@ -44,8 +47,9 @@ typedef struct {
     uint8_t e2e_recv_key[E2E_KEY_LEN];
     bool is_send_ready;
     uint8_t e2e_send_key[E2E_KEY_LEN];
+    int peer_db_id; /* המזהה הקבוע של איש הקשר בדיסק */
 } connection_context_t;
 
 int start_client_application(void);
 
-#endif 
+#endif

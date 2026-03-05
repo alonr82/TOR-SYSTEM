@@ -22,7 +22,8 @@ INCLUDES = \
 	-Iclient/client_run \
 	-Iclient/client_run/header \
 	-Idest_server/header \
-	-Icrypto/header
+	-Icrypto/header \
+	-Idata_base/header
 
 # ---------- Binaries ----------
 DIR_BIN         = dir_server
@@ -72,9 +73,10 @@ SRC_RELAY = \
 	sock_utilities/src/tor_in_out.c \
 	$(SRC_CRYPTO)
 
-# --- כאן תיקנו את הנתיב ל-src/client_run.c ---
+# הוספנו את תיקיית מסד הנתונים לכאן
 SRC_CLIENT = \
 	client/src/client_main.c \
+	data_base/src/db_manager.c \
 	client/client_run/src/client_run.c \
 	client/create_circuit/src/create_circuit.c \
 	common/src/dir_server_config.c \
@@ -103,8 +105,9 @@ $(DIR_BIN): $(OBJ_DIR)
 $(RELAY_BIN): $(OBJ_RELAY)
 	$(CC) $(CFLAGS) $(OBJ_RELAY) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
+# הוספנו את -lsqlcipher עבור הלקוח
 $(CLIENT_BIN): $(OBJ_CLIENT)
-	$(CC) $(CFLAGS) $(OBJ_CLIENT) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
+	$(CC) $(CFLAGS) $(OBJ_CLIENT) -o $@ $(LDFLAGS) $(CRYPTO_LIBS) -lsqlcipher
 
 $(DEST_BIN): $(OBJ_DEST)
 	$(CC) $(CFLAGS) $(OBJ_DEST) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)

@@ -58,7 +58,6 @@ static bool handle_send_relay(int client_fd)
         free(relay_list);
     }
     return retval;
-
 }
 
 relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_req_t* request)
@@ -73,7 +72,6 @@ relay_decript_t* get_data_from_req(user_descriptor_t* user, relay_req_t* request
         retval->is_active = true;
         memcpy(retval->identify_pub, 
             request->request_details_u.signup_request.identify_pub, TOR_ID_PUB_LEN);
-
     }
     return retval;
 }
@@ -124,7 +122,6 @@ static void client_callback(user_descriptor_t* user)
                     close(user->fd);
                 }
             }
-            
         }
         else if(request.request_type == RELAY_REQUEST && request.request_u.relay_req.request_type == RELAY_REG_SIGNOUT)
         {
@@ -146,6 +143,13 @@ static void client_callback(user_descriptor_t* user)
         {
             handle_send_relay(user->fd);
         }
+        else if(request.request_type == CLIENT_ROUTE_SELECTED)
+        {
+            update_relays_load(request.request_u.create_circuit_req.guard_index, 
+                               request.request_u.create_circuit_req.middle_index, 
+                               request.request_u.create_circuit_req.exit_index);
+            close(user->fd);
+        }
     }
     return;
 }
@@ -153,9 +157,7 @@ static void client_callback(user_descriptor_t* user)
 static void* relay_accept_loop_func(void* _)
 {   
     (void)(_);
-
     accept_loop(server_socket_fd, client_callback);
-
     return NULL;
 }
 
@@ -201,7 +203,6 @@ server_running_status_e run_dir_server(const char *config_file)
                 pthread_join(connection_thread_id, NULL);
                 free_relay_manager();
             }
-
         }
     }
     if (server_socket_fd != FAILURE)
@@ -211,5 +212,4 @@ server_running_status_e run_dir_server(const char *config_file)
     }
     free_server_config(config);
     return retval;
-
 }

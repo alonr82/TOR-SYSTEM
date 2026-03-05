@@ -17,6 +17,7 @@
                 "${workspaceFolder}/dest_server/header",
                 "${workspaceFolder}/crypto/header",
                 "${workspaceFolder}/client/client_run/header",
+                "${workspaceFolder}/data_base/header",
                 "/usr/include/node"
             ],
             "compilerPath": "/usr/bin/gcc",

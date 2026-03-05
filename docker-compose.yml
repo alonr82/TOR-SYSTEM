@@ -1,0 +1,31 @@
+version: '3.8'
+
+networks:
+  tor_network:
+    ipam:
+      config:
+        - subnet: 10.0.0.0/24
+
+services:
+  # שרת הרישום המרכזי - הלב של הרשת (תמיד ירוץ על 10.0.0.10)
+  dir_node:
+    build: .
+    image: torsystem_image
+    command: ./dir_server dir.cfg
+    stdin_open: true
+    tty: true
+    networks:
+      tor_network:
+        ipv4_address: 10.0.0.10
+
+  # תבנית כללית לנתב (Relay) - נוכל לשכפל אותה כמה שנרצה!
+  relay:
+    image: torsystem_image
+    command: ./relay_node dir.cfg
+    stdin_open: true
+    tty: true
+    depends_on:
+      - dir_node
+    networks:
+      - tor_network
+      

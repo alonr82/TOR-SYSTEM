@@ -21,8 +21,10 @@ int relay_listen_on_any_port(uint16_t *out_port)
         struct sockaddr_in addr;
         memset(&addr, 0, sizeof(addr));
         addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); 
-        addr.sin_port = htons(0); /* OS decides which  port to use!! maybe need change*/               
+        addr.sin_addr.s_addr = htonl(INADDR_ANY); 
+        addr.sin_port = htons(0); 
+                     
+        
         if (bind(retval, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
         {
             perror("bind");

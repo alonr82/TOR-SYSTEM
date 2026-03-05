@@ -13,7 +13,8 @@
 typedef enum
 {
     CLIENT_REQUEST = 1,
-    RELAY_REQUEST
+    RELAY_REQUEST,
+    CLIENT_ROUTE_SELECTED 
 }request_type_e;
 
 typedef enum {
@@ -42,11 +43,6 @@ typedef struct
     uint8_t   payload[TOR_MSG_SIZE - sizeof(tor_header_t)];
 } __attribute__((packed)) tor_msg_t;
 
-/*
- * DATA routing envelope for exit->peer delivery.
- * exit פותח את זה ומתחבר ל-dest_ip/dest_port.
- * בתוך inner יש tor_msg_t מלא (שיכול להכיל ciphertext E2E).
- */
 typedef struct
 {
     uint32_t dest_ip_v4;    /* network byte order */

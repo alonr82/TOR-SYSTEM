@@ -58,7 +58,8 @@ SRC_DIR = \
 	server/relay_manager/src/relay_manager.c \
 	sock_utilities/src/create_bind.c \
 	sock_utilities/src/accept.c \
-	sock_utilities/src/tor_in_out.c
+	sock_utilities/src/tor_in_out.c \
+	$(SRC_CRYPTO)
 
 SRC_RELAY = \
 	relay/relay_main_test.c \
@@ -100,7 +101,7 @@ all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN)
 
 # ---------- Build rules ----------
 $(DIR_BIN): $(OBJ_DIR)
-	$(CC) $(CFLAGS) $(OBJ_DIR) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OBJ_DIR) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 $(RELAY_BIN): $(OBJ_RELAY)
 	$(CC) $(CFLAGS) $(OBJ_RELAY) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)

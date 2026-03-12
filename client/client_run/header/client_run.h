@@ -29,6 +29,8 @@
 #define CMD_HISTORY_PREFIX_LEN 9
 #define CMD_SEND_PREFIX "/send "
 #define CMD_SEND_PREFIX_LEN 6
+#define CMD_PING_PREFIX "/ping "
+#define CMD_PING_PREFIX_LEN 6
 #define CMD_CONNECT_PREFIX "/connect "
 #define CMD_CONNECT_PREFIX_LEN  9
 
@@ -36,7 +38,8 @@
 #define EXPECTED_PARSED_CONNECT 2
 #define OPENSSL_SUCCESS 1
 
-typedef struct {
+typedef struct 
+{
     int socket_fd;
     bool is_active;
     bool is_initiator;
@@ -47,7 +50,7 @@ typedef struct {
     uint8_t e2e_recv_key[E2E_KEY_LEN];
     bool is_send_ready;
     uint8_t e2e_send_key[E2E_KEY_LEN];
-    int peer_db_id; /* המזהה הקבוע של איש הקשר בדיסק */
+    int peer_db_id; 
 } connection_context_t;
 
 int start_client_application(void);

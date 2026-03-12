@@ -5,6 +5,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+static const uint8_t DIR_SERVER_PUB_KEY[32] = {
+    0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7, 
+    0xd5, 0x4b, 0xfe, 0xd3, 0xc9, 0x64, 0x07, 0x3a, 
+    0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25, 
+    0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a
+};
+
 static void fill_circuit_relays(circuit_t *circuit, relay_decript_t *relays_list)
 {
     for(int index = 0; index < CIRCUIT_LEN; index++)
@@ -18,8 +25,26 @@ static relay_decript_t* get_list_from_dir_server(int sock_fd, uint32_t *relays_a
     relay_decript_t *relay_list = calloc(MAX_RELAY_BATCH_SIZE, sizeof(relay_decript_t));
     if(relay_list != NULL)
     {
-        read_exact(sock_fd, relays_amount, sizeof(uint32_t));
-        read_exact(sock_fd, relay_list, (*relays_amount) * sizeof(relay_decript_t));
+        if(read_exact(sock_fd, relays_amount, sizeof(uint32_t)) == false) {
+            free(relay_list); return NULL;
+        }
+        uint8_t signature[64];
+        if(read_exact(sock_fd, signature, 64) == false) {
+            free(relay_list); return NULL;
+        }
+        if(read_exact(sock_fd, relay_list, (*relays_amount) * sizeof(relay_decript_t)) == false) {
+            free(relay_list); return NULL;
+        }
+        if (!tor_ed25519_verify(DIR_SERVER_PUB_KEY, signature, (const uint8_t*)relay_list, (*relays_amount) * sizeof(relay_decript_t)))
+        {
+            printf("\n[!!! SECURITY ALERT !!!] Directory Server Signature INVALID!\n");
+            printf("Potential Man-in-the-Middle (MITM) attack detected. Dropping connection.\n> ");
+            fflush(stdout);
+            free(relay_list);
+            return NULL;
+        }
+        
+        printf("[Security] Directory Server identity and relay list verified successfully.\n");
     }
     return relay_list;
 }

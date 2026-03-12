@@ -113,60 +113,51 @@ static void print_active_connections(void)
     pthread_mutex_unlock(&g_conn_mutex);
 }
 
-static bool reply_to_client(int connection_index, const char* message)
+static bool reply_to_client(int connection_index, const char* message, bool save_to_db)
 {
     bool retval = false;
 
-    if (connection_index >= 0)
+    if (connection_index >= 0 && connection_index < MAX_ACTIVE_CONNECTIONS)
     {
-        if (connection_index < MAX_ACTIVE_CONNECTIONS)
+        pthread_mutex_lock(&g_conn_mutex);
+        connection_context_t* current_client = &g_connections[connection_index];
+        bool is_client_ready = (current_client->is_active == true && current_client->is_send_ready == true);
+        if (is_client_ready == true)
         {
-            pthread_mutex_lock(&g_conn_mutex);
-            connection_context_t* current_client = &g_connections[connection_index];
-            bool is_client_ready = (current_client->is_active == true && current_client->is_send_ready == true);
-            if (is_client_ready == true)
+            uint16_t msg_len = (uint16_t)strlen(message);
+            if (current_client->is_initiator == true)
             {
-                uint16_t msg_len = (uint16_t)strlen(message);
-                if (current_client->is_initiator == true)
+                bool is_sent = chat_send_encrypted(&current_client->circuit, 
+                                                   current_client->peer_ip_nbo, 
+                                                   current_client->peer_port_nbo, 
+                                                   current_client->e2e_send_key, 
+                                                   (const uint8_t*)message, 
+                                                   msg_len);
+                if (is_sent == true) retval = true;
+            }
+            else
+            {
+                uint8_t cipher[TOR_MSG_SIZE];
+                uint16_t cipher_len = 0;
+                bool is_encrypted = gen_encrypted_framed_message((const uint8_t*)message, msg_len, current_client->e2e_send_key, cipher, &cipher_len);
+                if (is_encrypted == true)
                 {
-                    bool is_sent = chat_send_encrypted(&current_client->circuit, 
-                                                       current_client->peer_ip_nbo, 
-                                                       current_client->peer_port_nbo, 
-                                                       current_client->e2e_send_key, 
-                                                       (const uint8_t*)message, 
-                                                       msg_len);
-                    if (is_sent == true)
-                    {
-                        retval = true;
-                    }
-                }
-                else
-                {
-                    uint8_t cipher[TOR_MSG_SIZE];
-                    uint16_t cipher_len = 0;
-                    bool is_encrypted = gen_encrypted_framed_message((const uint8_t*)message, msg_len, current_client->e2e_send_key, cipher, &cipher_len);
-                    if (is_encrypted == true)
-                    {
-                        tor_msg_t outgoing_msg;
-                        memset(&outgoing_msg, 0, sizeof(outgoing_msg));
-                        outgoing_msg.header.type = TOR_MSG_DATA;
-                        outgoing_msg.header.payload_len = htons(cipher_len);
-                        memcpy(outgoing_msg.payload, cipher, cipher_len);
+                    tor_msg_t outgoing_msg;
+                    memset(&outgoing_msg, 0, sizeof(outgoing_msg));
+                    outgoing_msg.header.type = TOR_MSG_DATA;
+                    outgoing_msg.header.payload_len = htons(cipher_len);
+                    memcpy(outgoing_msg.payload, cipher, cipher_len);
 
-                        bool is_sent = tor_send_msg(current_client->socket_fd, &outgoing_msg);
-                        if (is_sent == true)
-                        {
-                            retval = true;
-                        }
-                    }
+                    bool is_sent = tor_send_msg(current_client->socket_fd, &outgoing_msg);
+                    if (is_sent == true) retval = true;
                 }
             }
-            pthread_mutex_unlock(&g_conn_mutex);
+        }
+        pthread_mutex_unlock(&g_conn_mutex);
 
-            if (retval == true)
-            {
-                db_save_message(current_client->peer_db_id, message, true);
-            }
+        if (retval == true && save_to_db == true)
+        {
+            db_save_message(current_client->peer_db_id, message, true);
         }
     }
     return retval;
@@ -225,10 +216,23 @@ static void handle_client_message(int connection_index, connection_context_t* cl
                     if (out_len < TOR_MSG_SIZE)
                     {
                         plaintext[out_len] = '\0';
-                        printf("\n[Peer %d] %s\n> ", client->peer_db_id, (char*)plaintext);
-                        fflush(stdout);
                         
-                        db_save_message(client->peer_db_id, (const char*)plaintext, false);
+                        /* In-Band Signaling for Ping/Pong */
+                        if (strcmp((char*)plaintext, "PING") == 0)
+                        {
+                            reply_to_client(connection_index, "PONG", false);
+                        }
+                        else if (strcmp((char*)plaintext, "PONG") == 0)
+                        {
+                            printf("\n[System] Connection %d is ALIVE (Ping successful) \n> ", connection_index);
+                            fflush(stdout);
+                        }
+                        else
+                        {
+                            printf("\n[Peer %d] %s\n> ", client->peer_db_id, (char*)plaintext);
+                            fflush(stdout);
+                            db_save_message(client->peer_db_id, (const char*)plaintext, false);
+                        }
                     }
                 }
             }
@@ -445,9 +449,40 @@ static void* worker_read_thread(void* arg)
                 }
             }
         }
-        close_connection(connection_index);
-        printf("\n[System] Connection %d disconnected.\n> ", connection_index);
-        fflush(stdout);
+        
+        /* ---- טיפול חכם בקריסה וסיוע למשתמש (Fail-Fast & UX) ---- */
+        if (current_client->peer_ip_nbo != 0) /* בודק אם באמת נוצר חיבור קודם */
+        {
+            struct in_addr ip_addr;
+            ip_addr.s_addr = current_client->peer_ip_nbo;
+            char ip_str[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &ip_addr, ip_str, INET_ADDRSTRLEN);
+            uint16_t port = ntohs(current_client->peer_port_nbo);
+            bool was_initiator = current_client->is_initiator;
+
+            close_connection(connection_index);
+
+            printf("\n[!!! SYSTEM ALERT !!!] Connection %d has dropped!\n", connection_index);
+            printf("Reason: A relay in your circuit crashed, or the peer disconnected.\n");
+
+            if (was_initiator == true)
+            {
+                printf("[System] To build a NEW secure route to this destination, copy and run:\n");
+                printf("         /connect %s %u\n> ", ip_str, port);
+            }
+            else
+            {
+                printf("[System] Waiting for the peer to rebuild their route and reconnect to you...\n> ");
+            }
+            fflush(stdout);
+        }
+        else
+        {
+            close_connection(connection_index);
+            printf("\n[System] Connection %d disconnected.\n> ", connection_index);
+            fflush(stdout);
+        }
+        /* --------------------------------------------------------- */
     }
     return retval;
 }
@@ -545,8 +580,8 @@ static void run_chat_interface(void)
     bool is_running = true;
     printf("[System] Chat interface ready.\n");
     
-    printf("[System] Commands: %s, %s, %s<IP> <Port>, %s<Conn_ID> <msg>, %s<Chat_ID>, %s\n", 
-            CMD_CLIENTS, CMD_CHATS, CMD_CONNECT_PREFIX, CMD_SEND_PREFIX, CMD_HISTORY_PREFIX, CMD_QUIT);
+    printf("[System] Commands: %s, %s, %s<IP> <Port>, %s<Conn_ID> <msg>, %s<Conn_ID>, %s<Conn_ID>, %s<Chat_ID>, %s\n", 
+            CMD_CLIENTS, CMD_CHATS, CMD_CONNECT_PREFIX, CMD_SEND_PREFIX, CMD_PING_PREFIX, "/disconnect ", CMD_HISTORY_PREFIX, CMD_QUIT);
             
     while (is_running == true)
     {
@@ -594,7 +629,7 @@ static void run_chat_interface(void)
                 int parsed_items = sscanf(chat_line + CMD_SEND_PREFIX_LEN, "%d %[^\n]", &target_id, message_content);
                 if (parsed_items == EXPECTED_PARSED_SEND)
                 {
-                    bool is_sent = reply_to_client(target_id, message_content);
+                    bool is_sent = reply_to_client(target_id, message_content, true);
                     if (is_sent == false)
                     {
                         printf("[System] Failed to send message to connection %d.\n", target_id);
@@ -603,6 +638,36 @@ static void run_chat_interface(void)
                 else
                 {
                     printf("[System] Usage: %s<Connection_ID> <message>\n", CMD_SEND_PREFIX);
+                }
+            }
+            else if (strncmp(chat_line, CMD_PING_PREFIX, CMD_PING_PREFIX_LEN) == 0)
+            {
+                int target_id = 0;
+                if (sscanf(chat_line + CMD_PING_PREFIX_LEN, "%d", &target_id) == 1)
+                {
+                    printf("[System] Pinging connection %d...\n", target_id);
+                    bool is_sent = reply_to_client(target_id, "PING", false);
+                    if (is_sent == false)
+                    {
+                        printf("[System] Failed to send PING (Connection is DEAD).\n");
+                    }
+                }
+                else
+                {
+                    printf("[System] Usage: %s<Connection_ID>\n", CMD_PING_PREFIX);
+                }
+            }
+            else if (strncmp(chat_line, "/disconnect ", 12) == 0)
+            {
+                int target_id = 0;
+                if (sscanf(chat_line + 12, "%d", &target_id) == 1)
+                {
+                    close_connection(target_id);
+                    printf("[System] Connection %d closed manually. Route discarded.\n", target_id);
+                }
+                else
+                {
+                    printf("[System] Usage: /disconnect <Connection_ID>\n");
                 }
             }
             else if (strncmp(chat_line, CMD_HISTORY_PREFIX, CMD_HISTORY_PREFIX_LEN) == 0)

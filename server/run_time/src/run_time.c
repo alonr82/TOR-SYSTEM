@@ -1,6 +1,14 @@
 #include "run_time.h"
+#include "tor_crypto.h"
 
 static int server_socket_fd;
+
+static const uint8_t DIR_SERVER_PRIV_KEY[32] = {
+    0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60, 
+    0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4, 
+    0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19, 
+    0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60
+};
 
 static void run_commands()
 {
@@ -24,39 +32,39 @@ static void run_commands()
 
 static bool handle_send_relay(int client_fd)
 {
-    bool retval =true;
+    bool retval = true;
     uint32_t start = 0;
     relay_decript_t *relay_list = calloc(MAX_RELAY_BATCH_SIZE, sizeof(relay_decript_t));
     if(relay_list == NULL)
+    {
+        return false;
+    }
+    uint32_t fetched_relays = get_relay_batch(relay_list, &start, MAX_RELAY_BATCH_SIZE);
+    for(uint32_t index = 0; index < fetched_relays; index++)
+    {
+        printf("Relay index: %u, IP adress: %u.%u.%u.%u, Port: %u, Active: %u\n", index,
+                relay_list[index].relay_ip[0],relay_list[index].relay_ip[1],
+                relay_list[index].relay_ip[2],relay_list[index].relay_ip[3],
+                relay_list[index].relay_port,relay_list[index].is_active);
+    }
+    if(write_exact(client_fd, &fetched_relays, sizeof(uint32_t)) == false)
     {
         retval = false;
     }
     else
     {
-        uint32_t fetched_relays = get_relay_batch(relay_list, &start, MAX_RELAY_BATCH_SIZE);
-        for(uint32_t index = 0; index < fetched_relays; index++)
-        {
-            printf("Relay index: %u, IP adress: %u.%u.%u.%u, Port: %u, Active: %u\n", index,
-                   relay_list[index].relay_ip[0],
-                   relay_list[index].relay_ip[1],
-                   relay_list[index].relay_ip[2],
-                   relay_list[index].relay_ip[3],
-                   relay_list[index].relay_port,
-                   relay_list[index].is_active);
-        }
-        if(write_exact(client_fd,&fetched_relays,sizeof(uint32_t)) == false)
+        uint8_t signature[64];
+        tor_ed25519_sign(signature, DIR_SERVER_PRIV_KEY, (const uint8_t*)relay_list, fetched_relays * sizeof(relay_decript_t));
+        if(write_exact(client_fd, signature, 64) == false)
         {
             retval = false;
         }
-        else
+        else if(write_exact(client_fd, relay_list, fetched_relays * sizeof(relay_decript_t)) == false)
         {
-            if(write_exact(client_fd, relay_list, fetched_relays * sizeof(relay_decript_t)) == false)
-            {
-                retval = false;
-            }
+            retval = false;
         }
-        free(relay_list);
     }
+    free(relay_list);
     return retval;
 }
 

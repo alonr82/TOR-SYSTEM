@@ -3,6 +3,75 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 
+static void log_attacker_relay_message(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    printf("[ATTACKER RELAY] ");
+    vprintf(format, args);
+    printf("\n");
+    fflush(stdout);
+    va_end(args);
+}
+
+static void log_attacker_packet_metadata(const char* direction, const tor_msg_t *message)
+{
+    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+    {
+        if(message != NULL)
+        {
+            log_attacker_relay_message("direction=%s outer_type=%u payload_len=%u",
+                                       direction,
+                                       message->header.type,
+                                       ntohs(message->header.payload_len));
+        }
+    }
+}
+
+static void log_attacker_extend_metadata(const tor_extend_t *ext)
+{
+    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+    {
+        if(ext != NULL)
+        {
+            uint32_t ip_nbo = ext->ip_v4;
+            struct in_addr addr;
+            char ip_str[INET_ADDRSTRLEN];
+
+            addr.s_addr = ip_nbo;
+            memset(ip_str, 0, sizeof(ip_str));
+            inet_ntop(AF_INET, &addr, ip_str, sizeof(ip_str));
+
+            log_attacker_relay_message("observed EXTEND target=%s:%u",
+                                       ip_str,
+                                       ntohs(ext->port));
+        }
+    }
+}
+
+static void log_attacker_exit_metadata(const tor_data_route_t *route)
+{
+    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+    {
+        if(route != NULL)
+        {
+            struct in_addr addr;
+            char ip_str[INET_ADDRSTRLEN];
+            uint16_t inner_len = ntohs(route->inner_len);
+
+            addr.s_addr = route->dest_ip_v4;
+            memset(ip_str, 0, sizeof(ip_str));
+            inet_ntop(AF_INET, &addr, ip_str, sizeof(ip_str));
+
+            log_attacker_relay_message("observed EXIT routing destination=%s:%u inner_len=%u",
+                                       ip_str,
+                                       ntohs(route->dest_port),
+                                       inner_len);
+            log_attacker_relay_message("payload remains end-to-end encrypted, content not visible");
+        }
+    }
+}
+
 bool process_create_handshake(session_t *session, tor_msg_t *in_msg, tor_msg_t *out_msg, const uint8_t *priv_seed)
 {
     bool retval = true;
@@ -42,6 +111,11 @@ bool process_create_handshake(session_t *session, tor_msg_t *in_msg, tor_msg_t *
                     memcpy(created_res->relay_x25519_pub, relay_ephemeral_pub, TOR_X25519_KEY_LEN);
                     out_msg->header.type = TOR_MSG_CREATED;
                     out_msg->header.payload_len = htons(sizeof(tor_created_t));
+
+                    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+                    {
+                        log_attacker_relay_message("completed CREATE handshake with previous hop");
+                    }
                 }
             }
         }
@@ -53,6 +127,8 @@ static bool handle_extend_request(session_t *session, tor_msg_t *decrypted_msg, 
 {
     bool retval = true;
     tor_extend_t *ext = (tor_extend_t *)decrypted_msg->payload;
+
+    log_attacker_extend_metadata(ext);
 
     int extended_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(extended_fd < 0)
@@ -101,6 +177,11 @@ static bool handle_extend_request(session_t *session, tor_msg_t *decrypted_msg, 
 
                     reply_msg->header.type = TOR_MSG_EXTENDED;
                     reply_msg->header.payload_len = htons(sizeof(tor_extended_t));
+
+                    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+                    {
+                        log_attacker_relay_message("extended circuit successfully to next hop");
+                    }
                 }
             }
         }
@@ -159,6 +240,8 @@ static bool process_data_in_forward(session_t *session, tor_msg_t *decrypted_msg
     else
     {
         tor_data_route_t *route = (tor_data_route_t*)decrypted_msg->payload;
+
+        log_attacker_exit_metadata(route);
 
         uint16_t inner_len = ntohs(route->inner_len);
         uint16_t route_hdr_len = (uint16_t)(sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t));
@@ -275,6 +358,10 @@ static bool handle_peeled_data(session_t *session, tor_msg_t *in_msg)
     else
     {
         tor_msg_t *decrypted_msg = (tor_msg_t *)plaintext;
+        if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+        {
+            log_attacker_relay_message("peeled one onion layer successfully");
+        }
         if(!route_decrypted_msg(session, decrypted_msg))
         {
             retval = false;
@@ -295,6 +382,8 @@ static bool forward_last_to_next(session_t *session)
     }
     else
     {
+        log_attacker_packet_metadata("prev_to_this", &in_msg);
+
         if(in_msg.header.type == TOR_MSG_DATA)
         {
             if(session->hop_key_ready)
@@ -341,6 +430,8 @@ static bool forward_next_to_last(session_t *session)
     }
     else
     {
+        log_attacker_packet_metadata("next_to_this", &in_msg);
+
         if(session->hop_key_ready)
         {
             tor_msg_t out_msg;

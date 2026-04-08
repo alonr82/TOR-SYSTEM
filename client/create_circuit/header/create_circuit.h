@@ -8,7 +8,7 @@
 #include "tor_crypto.h"
 #include <time.h>
 
-#define MAX_RELAY_BATCH_SIZE 10
+#define MAX_RELAY_BATCH_SIZE 128
 
 bool connect_to_dir_server(const char *dir_cfg);
 

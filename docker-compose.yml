@@ -1,31 +1,156 @@
-version: '3.8'
+services:
+  directory:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_directory
+    working_dir: /app
+    command: >
+      bash -lc '
+      printf "ip=0.0.0.0\nport=9000\n" > dir.cfg &&
+      ./dir_server dir.cfg
+      '
+    ports:
+      - "9000:9000"
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.10
+    stdin_open: true
+    tty: true
+
+  relay_legit_1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_relay_legit_1
+    working_dir: /app
+    command: >
+      bash -lc '
+      printf "ip=172.28.0.10\nport=9000\n" > dir.cfg &&
+      ./relay_node dir.cfg
+      '
+    depends_on:
+      - directory
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.21
+
+  relay_legit_2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_relay_legit_2
+    working_dir: /app
+    command: >
+      bash -lc '
+      printf "ip=172.28.0.10\nport=9000\n" > dir.cfg &&
+      ./relay_node dir.cfg
+      '
+    depends_on:
+      - directory
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.22
+
+  relay_legit_3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_relay_legit_3
+    working_dir: /app
+    command: >
+      bash -lc '
+      printf "ip=172.28.0.10\nport=9000\n" > dir.cfg &&
+      ./relay_node dir.cfg
+      '
+    depends_on:
+      - directory
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.23
+
+  relay_malicious_1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_relay_malicious_1
+    working_dir: /app
+    environment:
+      TOR_RELAY_MODE: malicious
+    command: >
+      bash -lc '
+      printf "ip=172.28.0.10\nport=9000\n" > dir.cfg &&
+      ./relay_node dir.cfg
+      '
+    depends_on:
+      - directory
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.31
+
+  client_1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_client_1
+    working_dir: /app
+    command: >
+      bash -lc '
+      mkdir -p config &&
+      printf "ip=172.28.0.10\nport=9000\n" > dir.cfg &&
+      cp dir.cfg config/dir_server_config.cfg &&
+      sleep infinity
+      '
+    depends_on:
+      - directory
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.41
+    stdin_open: true
+    tty: true
+
+  client_2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tor_client_2
+    working_dir: /app
+    command: >
+      bash -lc '
+      mkdir -p config &&
+      printf "ip=172.28.0.10\nport=9000\n" > dir.cfg &&
+      cp dir.cfg config/dir_server_config.cfg &&
+      sleep infinity
+      '
+    depends_on:
+      - directory
+    volumes:
+      - simulation_data:/app/simulation
+    networks:
+      tor_net:
+        ipv4_address: 172.28.0.42
+    stdin_open: true
+    tty: true
 
 networks:
-  tor_network:
+  tor_net:
+    driver: bridge
     ipam:
       config:
-        - subnet: 10.0.0.0/24
+        - subnet: 172.28.0.0/16
 
-services:
-  # שרת הרישום המרכזי - הלב של הרשת (תמיד ירוץ על 10.0.0.10)
-  dir_node:
-    build: .
-    image: torsystem_image
-    command: ./dir_server dir.cfg
-    stdin_open: true
-    tty: true
-    networks:
-      tor_network:
-        ipv4_address: 10.0.0.10
-
-  # תבנית כללית לנתב (Relay) - נוכל לשכפל אותה כמה שנרצה!
-  relay:
-    image: torsystem_image
-    command: ./relay_node dir.cfg
-    stdin_open: true
-    tty: true
-    depends_on:
-      - dir_node
-    networks:
-      - tor_network
-      
+volumes:
+  simulation_data:
+  

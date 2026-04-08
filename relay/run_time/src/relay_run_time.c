@@ -1,7 +1,14 @@
-#define _DEFAULT_SOURCE 
+#define _DEFAULT_SOURCE
 
 #include "relay_run_time.h"
 #include <unistd.h> 
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+
+#define MALICIOUS_REGISTRY_DIR "simulation"
+#define MALICIOUS_REGISTRY_PATH "simulation/malicious_relays_registry.txt"
 
 static int relay_listen_fd = -1;
 static relay_req_res_t* relay_signup_response;
@@ -10,6 +17,95 @@ static pthread_t accept_thread;
 
 uint8_t g_relay_identity_pub[TOR_ED25519_PUB_LEN];
 uint8_t g_relay_identity_priv_seed[TOR_ED25519_SEED_LEN];
+relay_runtime_mode_e g_relay_runtime_mode = relay_runtime_mode_normal;
+
+static relay_runtime_mode_e get_relay_mode_from_environment(void)
+{
+    relay_runtime_mode_e retval = relay_runtime_mode_normal;
+    const char* mode_env = getenv("TOR_RELAY_MODE");
+
+    if(mode_env != NULL)
+    {
+        if(strcmp(mode_env, "malicious") == 0)
+        {
+            retval = relay_runtime_mode_attacker_controlled;
+        }
+    }
+
+    return retval;
+}
+
+static bool ensure_simulation_directory_exists(void)
+{
+    bool retval = true;
+    struct stat st;
+
+    if(stat(MALICIOUS_REGISTRY_DIR, &st) == 0)
+    {
+        if(S_ISDIR(st.st_mode) == 0)
+        {
+            retval = false;
+        }
+    }
+    else
+    {
+        if(mkdir(MALICIOUS_REGISTRY_DIR, 0700) != 0)
+        {
+            if(errno != EEXIST)
+            {
+                retval = false;
+            }
+        }
+    }
+
+    return retval;
+}
+
+static void bytes_to_hex_string(const uint8_t* input, uint32_t input_len, char* output, uint32_t output_size)
+{
+    static const char* hex_chars = "0123456789ABCDEF";
+    uint32_t index = 0;
+
+    if(input != NULL && output != NULL && output_size >= (input_len * 2 + 1))
+    {
+        for(index = 0; index < input_len; index++)
+        {
+            output[index * 2] = hex_chars[(input[index] >> 4) & 0x0F];
+            output[index * 2 + 1] = hex_chars[input[index] & 0x0F];
+        }
+        output[input_len * 2] = '\0';
+    }
+}
+
+static bool register_attacker_identity_in_simulation_registry(const uint8_t identity_pub[TOR_ED25519_PUB_LEN])
+{
+    bool retval = true;
+    FILE* registry_file = NULL;
+    char identity_hex[TOR_ED25519_PUB_LEN * 2 + 1];
+
+    if(ensure_simulation_directory_exists() == false)
+    {
+        retval = false;
+    }
+    else
+    {
+        memset(identity_hex, 0, sizeof(identity_hex));
+        bytes_to_hex_string(identity_pub, TOR_ED25519_PUB_LEN, identity_hex, sizeof(identity_hex));
+
+        registry_file = fopen(MALICIOUS_REGISTRY_PATH, "a");
+        if(registry_file == NULL)
+        {
+            retval = false;
+        }
+        else
+        {
+            fprintf(registry_file, "%s\n", identity_hex);
+            fclose(registry_file);
+        }
+    }
+
+    return retval;
+}
 
 static void relay_run_commands(void)
 {
@@ -113,11 +209,34 @@ bool run_relay(const char * dir_cfg_path)
 {
     bool retval = true;
     relay_req_res_t * signup_response = NULL;
+
+    g_relay_runtime_mode = get_relay_mode_from_environment();
+    
+    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+    {
+        printf("relay_run_time: starting relay in attacker-controlled simulation mode\n");
+    }
+    else
+    {
+        printf("relay_run_time: starting relay in normal mode\n");
+    }
     
     if(!tor_ed25519_generate_identity_keypair(g_relay_identity_pub, g_relay_identity_priv_seed))
     {
         printf("relay_run_time: failed to generate ed25519 identity keypair\n");
         retval = false;
+    }
+
+    if(retval == true)
+    {
+        if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+        {
+            if(register_attacker_identity_in_simulation_registry(g_relay_identity_pub) == false)
+            {
+                printf("relay_run_time: failed to register attacker-controlled identity in simulation registry\n");
+                retval = false;
+            }
+        }
     }
     
     if(retval)

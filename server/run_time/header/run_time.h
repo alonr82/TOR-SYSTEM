@@ -10,16 +10,14 @@
 #include <pthread.h>
 #include "tor_protocol.h"
 
-#define MAX_RELAY_BATCH_SIZE 10
+#define MAX_RELAY_BATCH_SIZE 128
 #define INPUT_SIZE 256
+
 typedef enum
 {
     running_status_success = 0,
     running_status_failure
 }server_running_status_e;
-
-
-
 
 /**
  * @brief this function starts to get connections for the directory server

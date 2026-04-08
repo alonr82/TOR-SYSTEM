@@ -10,7 +10,6 @@
 #include "relay_reg.h"
 #include "forward_msg.h"
 
-
 /**
  * @brief this function runs the relay operations.
  * 
@@ -20,6 +19,4 @@
  */
 bool run_relay(const char * dir_cfg_path);
 
-
-
-#endif 
+#endif

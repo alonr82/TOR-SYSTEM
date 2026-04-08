@@ -9,11 +9,20 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <stdarg.h>
 
 #include "tor_protocol.h"
 #include "sock_utilities.h"
 
 #define TWO_SOCKETS 2
+
+typedef enum
+{
+    relay_runtime_mode_normal = 0,
+    relay_runtime_mode_attacker_controlled
+}relay_runtime_mode_e;
+
+extern relay_runtime_mode_e g_relay_runtime_mode;
 
 typedef struct {
     int last_fd;

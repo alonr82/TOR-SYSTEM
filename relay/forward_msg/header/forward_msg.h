@@ -13,6 +13,7 @@
 
 #include "tor_protocol.h"
 #include "sock_utilities.h"
+#include "simulation_state.h"
 
 #define TWO_SOCKETS 2
 

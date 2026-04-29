@@ -6,6 +6,7 @@
 #include "relay_reg.h"
 #include "dir_server_config.h"
 #include "tor_crypto.h"
+#include "simulation_state.h"
 #include <time.h>
 
 #define MAX_RELAY_BATCH_SIZE 128

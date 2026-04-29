@@ -363,10 +363,20 @@ static bool verify_extend_response(circuit_t *circuit, uint8_t client_ephemeral_
                 }
                 else
                 {
+                    extern g_client_defense_active;
                     uint8_t *relay_id_pub = circuit->relay_descripts[circuit->hops_created].identify_pub;
                     if(!tor_ed25519_verify(relay_id_pub, extended->created_data.sig, extended->created_data.relay_x25519_pub, TOR_X25519_KEY_LEN))
                     {
-                        retval = false;
+                        if(g_client_defense_active == true)
+                        {
+                            printf("\n [defense is active] invalid signature in EXTENDED! (potential attack detected, but defense is active\n> ");
+                            retval = false;
+                        }
+                        else
+                        {
+                            printf("[!!! SECURITY ALERT !!!] Invalid signature in EXTENDED response!\n");
+                            printf("defense against malicious relay is NOT active.\n");
+                        }
                     }
                     else
                     {

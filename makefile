@@ -23,7 +23,8 @@ INCLUDES = \
 	-Iclient/service/header \
 	-Idest_server/header \
 	-Icrypto/header \
-	-Idata_base/header
+	-Idata_base/header \
+	-Isyn_flood_attack/header
 
 DIR_BIN            = dir_server
 RELAY_BIN          = relay_node
@@ -31,6 +32,7 @@ CLIENT_BIN         = client_test
 CLIENT_SERVICE_BIN = client_service
 DEST_BIN           = dest_server_bin
 TEST_CRYPTO_BIN    = test_crypto_bin
+SYN_FLOOD_BIN      = syn_flooder
 
 DIR_CFG ?= dir.cfg
 CLIENT_CFG_DIR = config
@@ -109,13 +111,24 @@ SRC_DEST = \
 	sock_utilities/src/tor_in_out.c \
 	$(SRC_CRYPTO)
 
+# --- קבצי המקור של מתקפת SYN Flood ---
+SRC_SYN_FLOOD = \
+	syn_flood_attack/src/syn_flooder.c \
+	client/create_circuit/src/create_circuit.c \
+	common/src/dir_server_config.c \
+	sock_utilities/src/connect_server.c \
+	sock_utilities/src/tor_in_out.c \
+	$(SRC_SIM) \
+	$(SRC_CRYPTO)
+
 OBJ_DIR            = $(SRC_DIR:.c=.o)
 OBJ_RELAY          = $(SRC_RELAY:.c=.o)
 OBJ_CLIENT         = $(SRC_CLIENT:.c=.o)
 OBJ_CLIENT_SERVICE = $(SRC_CLIENT_SERVICE:.c=.o)
 OBJ_DEST           = $(SRC_DEST:.c=.o)
+OBJ_SYN_FLOOD      = $(SRC_SYN_FLOOD:.c=.o)
 
-all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(CLIENT_SERVICE_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN)
+all: $(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(CLIENT_SERVICE_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN) $(SYN_FLOOD_BIN)
 
 $(DIR_BIN): $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(OBJ_DIR) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
@@ -134,6 +147,10 @@ $(DEST_BIN): $(SRC_DEST)
 
 $(TEST_CRYPTO_BIN): $(SRC_TEST_CRYPTO)
 	$(CC) $(CFLAGS) $(INCLUDES) $(SRC_TEST_CRYPTO) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
+
+# --- קימפול המתקפה ---
+$(SYN_FLOOD_BIN): $(OBJ_SYN_FLOOD)
+	$(CC) $(CFLAGS) $(OBJ_SYN_FLOOD) -o $@ $(LDFLAGS) $(CRYPTO_LIBS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -173,6 +190,10 @@ run_dest: $(DEST_BIN)
 run_crypto: $(TEST_CRYPTO_BIN)
 	./$(TEST_CRYPTO_BIN)
 
+# --- הרצת מתקפת SYN Flood (דורש הרשאות מערכת!) ---
+run_syn_flood: $(SYN_FLOOD_BIN)
+	sudo ./$(SYN_FLOOD_BIN)
+
 valgrind_dir: cfg $(DIR_BIN)
 	valgrind $(VALGRIND_FLAGS) ./$(DIR_BIN) $(DIR_CFG)
 
@@ -200,12 +221,12 @@ stop_relays:
 
 clean:
 	rm -f \
-		$(OBJ_DIR) $(OBJ_RELAY) $(OBJ_CLIENT) $(OBJ_CLIENT_SERVICE) $(OBJ_DEST) \
-		$(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(CLIENT_SERVICE_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN) \
+		$(OBJ_DIR) $(OBJ_RELAY) $(OBJ_CLIENT) $(OBJ_CLIENT_SERVICE) $(OBJ_DEST) $(OBJ_SYN_FLOOD) \
+		$(DIR_BIN) $(RELAY_BIN) $(CLIENT_BIN) $(CLIENT_SERVICE_BIN) $(DEST_BIN) $(TEST_CRYPTO_BIN) $(SYN_FLOOD_BIN) \
 		$(DIR_CFG) $(CLIENT_CFG) $(MALICIOUS_REGISTRY_FILE) \
 		valgrind.relay.*.log valgrind.dir.*.log valgrind.client.*.log valgrind.client_service.*.log valgrind.dest.*.log
 
 .PHONY: all clean cfg \
-	run_dir run_relay run_relay_malicious run_relays10 run_client run_client_service run_dest run_crypto \
+	run_dir run_relay run_relay_malicious run_relays10 run_client run_client_service run_dest run_crypto run_syn_flood \
 	valgrind_dir valgrind_relay valgrind_relay_malicious valgrind_client valgrind_client_service valgrind_dest valgrind_crypto \
 	stop_relays

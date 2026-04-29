@@ -216,6 +216,34 @@ static void run_commands()
             simulation_state_reset();
             simulation_log_info("Simulation state reset");
         }
+        else if (strcmp(input, "sim circ_ext attack on") == 0)
+        {
+            if(simulation_state_set_flag("circ_ext", false, true) == true)
+            {
+                simulation_log_warn("Circuit Extension attack enabled");
+            }
+        }
+        else if (strcmp(input, "sim circ_ext attack off") == 0)
+        {
+            if(simulation_state_set_flag("circ_ext", false, false) == true)
+            {
+                simulation_log_info("Circuit Extension attack disabled");
+            }
+        }
+        else if (strcmp(input, "sim circ_ext defense on") == 0)
+        {
+            if(simulation_state_set_flag("circ_ext", true, true) == true)
+            {
+                simulation_log_info("Circuit Extension defense enabled");
+            }
+        }
+        else if (strcmp(input, "sim circ_ext defense off") == 0)
+        {
+            if(simulation_state_set_flag("circ_ext", true, false) == true)
+            {
+                simulation_log_info("Circuit Extension defense disabled");
+            }
+        }
     }
 }
 

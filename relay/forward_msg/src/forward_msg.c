@@ -129,63 +129,77 @@ static bool handle_extend_request(session_t *session, tor_msg_t *decrypted_msg, 
     tor_extend_t *ext = (tor_extend_t *)decrypted_msg->payload;
 
     log_attacker_extend_metadata(ext);
-
-    int extended_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(extended_fd < 0)
+    simulation_state_t sim_state = simulation_state_get_copy();
+    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
     {
-        retval = false;
+        log_attacker_relay_message("simulated attack: Circuit hijacked!\n");
+        tor_extended_t *extended_response = (tor_extended_t *)reply_msg->payload;
+        extended_response->status = ACK_EXTEND_OK;
+        memset(extended_response->created_data.sig, 0xFF, TOR_ED25519_SIG_LEN);
+        reply_msg->header.type = TOR_MSG_EXTENDED;
+        reply_msg->header.payload_len = htons(sizeof(tor_extended_t));
+        log_attacker_relay_message("Returning FAKE extended response to client");
     }
     else
     {
-        struct sockaddr_in addr;
-        memset(&addr,0,sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_port = ext->port;
-        addr.sin_addr.s_addr = ext->ip_v4;
-
-        if(connect(extended_fd,(struct sockaddr*)&addr, sizeof(addr)) < 0)
+        int extended_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if(extended_fd < 0)
         {
-            close(extended_fd);
             retval = false;
         }
         else
         {
-            session->next_fd = extended_fd;
+            struct sockaddr_in addr;
+            memset(&addr,0,sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_port = ext->port;
+            addr.sin_addr.s_addr = ext->ip_v4;
 
-            tor_msg_t create_msg;
-            memset(&create_msg, 0, sizeof(create_msg));
-            create_msg.header.type = TOR_MSG_CREATE;
-            create_msg.header.payload_len = htons(sizeof(tor_create_t));
-            memcpy(create_msg.payload, &ext->create_data, sizeof(tor_create_t));
-
-            if(!tor_send_msg(session->next_fd, &create_msg))
+            if(connect(extended_fd,(struct sockaddr*)&addr, sizeof(addr)) < 0)
             {
+                close(extended_fd);
                 retval = false;
             }
             else
             {
-                tor_msg_t created_msg;
-                if(!tor_recv_msg(session->next_fd, &created_msg) || created_msg.header.type != TOR_MSG_CREATED)
+                session->next_fd = extended_fd;
+
+                tor_msg_t create_msg;
+                memset(&create_msg, 0, sizeof(create_msg));
+                create_msg.header.type = TOR_MSG_CREATE;
+                create_msg.header.payload_len = htons(sizeof(tor_create_t));
+                memcpy(create_msg.payload, &ext->create_data, sizeof(tor_create_t));
+
+                if(!tor_send_msg(session->next_fd, &create_msg))
                 {
                     retval = false;
                 }
                 else
                 {
-                    tor_extended_t *extended_res = (tor_extended_t *)reply_msg->payload;
-                    extended_res->status = ACK_EXTEND_OK;
-                    memcpy(&extended_res->created_data, created_msg.payload, sizeof(tor_created_t));
-
-                    reply_msg->header.type = TOR_MSG_EXTENDED;
-                    reply_msg->header.payload_len = htons(sizeof(tor_extended_t));
-
-                    if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+                    tor_msg_t created_msg;
+                    if(!tor_recv_msg(session->next_fd, &created_msg) || created_msg.header.type != TOR_MSG_CREATED)
                     {
-                        log_attacker_relay_message("extended circuit successfully to next hop");
+                        retval = false;
+                    }
+                    else
+                    {
+                        tor_extended_t *extended_res = (tor_extended_t *)reply_msg->payload;
+                        extended_res->status = ACK_EXTEND_OK;
+                        memcpy(&extended_res->created_data, created_msg.payload, sizeof(tor_created_t));
+
+                        reply_msg->header.type = TOR_MSG_EXTENDED;
+                        reply_msg->header.payload_len = htons(sizeof(tor_extended_t));
+
+                        if(g_relay_runtime_mode == relay_runtime_mode_attacker_controlled)
+                        {
+                            log_attacker_relay_message("extended circuit successfully to next hop");
+                        }
                     }
                 }
             }
         }
     }
+    
     return retval;
 }
 

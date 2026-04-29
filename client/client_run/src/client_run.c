@@ -31,6 +31,7 @@ static int g_listen_fd = INVALID_SOCKET_FD;
 static bool g_is_service_mode = false;
 static client_core_event_callback_t g_event_callback = NULL;
 static bool g_random_seeded = false;
+bool g_client_defense_active = false;
 
 /* הזהות הקבועה שלנו */
 static uint8_t g_my_pub[32];
@@ -1217,7 +1218,7 @@ static void run_chat_interface(void)
     bool is_running = true;
 
     client_log("[System] Chat interface ready.\n");
-    client_log("[System] Commands: %s, %s, %s<IP> <Port>, %s<Conn_ID> <msg>, %s<Conn_ID>, %s<Conn_ID>, %s<Chat_ID>, %s\n", 
+    client_log("[System] Commands: %s, %s, %s<IP> <Port>, %s<Conn_ID> <msg>, %s<Conn_ID>, %s<Conn_ID>, %s<Chat_ID>,/defense on, /defense off, %s\n", 
                CMD_CLIENTS,
                CMD_CHATS,
                CMD_CONNECT_PREFIX,
@@ -1328,6 +1329,16 @@ static void run_chat_interface(void)
                 {
                     client_log("[System] Usage: %s<Chat_ID>\n", CMD_HISTORY_PREFIX);
                 }
+            }
+            else if (strcmp(chat_line, "/defense on") == 0)
+            {
+                g_client_defense_active = true;
+                client_log("[System] Defense mode is now ON. Circuit hijacking will be blocked.\n");
+            }
+            else if (strcmp(chat_line, "/defense off") == 0)
+            {
+                g_client_defense_active = false;
+                client_log("[System] Defense mode is now OFF. Vulnerable to circuit hijacking.\n");
             }
             else
             {

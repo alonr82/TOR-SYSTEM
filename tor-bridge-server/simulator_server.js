@@ -13,6 +13,9 @@ let currentScenario = 1;
 let availableRelays = [];
 let maliciousRelayIndex = -1;
 
+// פורט דינמי שמונע "היתקעות" של המערכת בהפעלות חוזרות
+let clientLocalPort = 34500; 
+
 let synQueueInterval = null;
 let sybilScoreInterval = null;
 
@@ -47,26 +50,21 @@ function runDockerCmd(cmd, successEvent) {
 
 function gracefulClientRestart(callback) {
     if (clientProcess && clientProcess.stdin && isClientReady) {
-        broadcastCEngineLog(`\n> [Auto] Sending /quit to safely release port...`);
+        broadcastCEngineLog(`\n> [Auto] Sending /quit to safely shut down old process...`);
         clientProcess.stdin.write("/quit\n");
-        setTimeout(() => {
-            if (clientProcess) {
-                clientProcess.kill();
-                clientProcess = null;
-            }
-            isClientReady = false;
-            if (callback) callback();
-        }, 800);
-    } else {
+    }
+    
+    setTimeout(() => {
         if (clientProcess) {
             clientProcess.kill();
             clientProcess = null;
         }
         isClientReady = false;
-        exec('docker exec tor_client_1 pkill client_test', () => {
+        
+        exec('docker exec tor_client_1 pkill -9 client_test', () => {
             if (callback) callback();
         });
-    }
+    }, 500);
 }
 
 function ensureClientRunning() {
@@ -84,8 +82,18 @@ function ensureClientRunning() {
             const chunk = data.toString();
             broadcastCEngineLog(chunk);
 
-            if (chunk.includes('Enter local listen port:')) clientProcess.stdin.write("34523\n");
-            if (chunk.includes('Enter Master Password')) clientProcess.stdin.write("12345\n");
+            // הגנה: בדיקה שהתהליך חי לפני כל כתיבה!
+            if (chunk.includes('Enter local listen port:')) {
+                clientLocalPort++;
+                if (clientProcess && clientProcess.stdin) {
+                    clientProcess.stdin.write(`${clientLocalPort}\n`);
+                }
+            }
+            if (chunk.includes('Enter Master Password')) {
+                if (clientProcess && clientProcess.stdin) {
+                    clientProcess.stdin.write("12345\n");
+                }
+            }
             
             if (chunk.includes('[System] Chat interface ready.')) {
                 isClientReady = true;
@@ -95,7 +103,9 @@ function ensureClientRunning() {
                         broadcastCEngineLog(`\n> [Auto-executing] /connect 10.0.0.5 80`);
                         availableRelays = [];
                         maliciousRelayIndex = -1;
-                        clientProcess.stdin.write("/connect 10.0.0.5 80\n");
+                        if (clientProcess && clientProcess.stdin) {
+                            clientProcess.stdin.write("/connect 10.0.0.5 80\n");
+                        }
                     }, 500);
                 }
             }
@@ -137,9 +147,7 @@ function ensureClientRunning() {
             let lines = stdoutBuffer.split('\n');
             stdoutBuffer = lines.pop(); 
 
-            // התיקון הקריטי: יצירת מרווח זמן (Delay) בין אירועים כדי ש-React לא ידרוס אותם
             let eventDelay = 0;
-
             for (const line of lines) {
                 const relayMatch = line.match(/\[(\d+)\] IP:.*Malicious\(sim\):\s*(yes|no)/);
                 if (relayMatch) {
@@ -186,6 +194,12 @@ function ensureClientRunning() {
             isClientStarting = false;
             isClientReady = false;
             broadcastVisualEvent('CLIENT_DISCONNECTED');
+        });
+        
+        clientProcess.on('error', () => {
+            clientProcess = null;
+            isClientStarting = false;
+            isClientReady = false;
         });
     });
 }
@@ -258,7 +272,9 @@ wss.on('connection', (ws) => {
                     availableRelays = [];
                     maliciousRelayIndex = -1;
                     broadcastCEngineLog(`\n> [Auto-executing] /connect 10.0.0.5 80`);
-                    clientProcess.stdin.write("/connect 10.0.0.5 80\n");
+                    if (clientProcess && clientProcess.stdin) {
+                        clientProcess.stdin.write("/connect 10.0.0.5 80\n");
+                    }
                 } else {
                     attackPending = true; 
                 }
@@ -269,7 +285,9 @@ wss.on('connection', (ws) => {
                 if (!clientProcess) {
                     ensureClientRunning();
                 } else if (isClientReady) {
-                    clientProcess.stdin.write(data.action === "DEFENSE_ON" ? "/defense on\n" : "/defense off\n");
+                    if (clientProcess && clientProcess.stdin) {
+                        clientProcess.stdin.write(data.action === "DEFENSE_ON" ? "/defense on\n" : "/defense off\n");
+                    }
                 }
             } else if (data.action === "RESET") {
                 runDockerCmd(`docker exec tor_directory_1 sh -c "echo 'sim reset' > /proc/1/fd/0"`, null);

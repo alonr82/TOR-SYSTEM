@@ -41,6 +41,9 @@ export function Scenario2Canvas({
   const [frozenPacket, setFrozenPacket] = useState<boolean>(false);
   
   const isActiveRef = useRef(false);
+  // התיקון: תעודת זהות ייחודית לכל ריצת אנימציה כדי למנוע דריסות כפולות
+  const runIdRef = useRef(0);
+  
   const backendStartRef = useRef(false);
   const backendMacResult = useRef<string>("none");
   const backendTeardown = useRef(false);
@@ -54,10 +57,9 @@ export function Scenario2Canvas({
     if (!backendEvent) return;
     
     const ev = backendEvent.event;
-    if (['REAL_CIRCUIT_START', 'CIRCUIT_BUILT', 'REAL_MAC_FAILED_DEFENSE', 'REAL_MAC_FAILED_ATTACK', 'REAL_CIRCUIT_TEARDOWN'].includes(ev)) {
+    if (ev === 'REAL_CIRCUIT_START') {
       backendStartRef.current = true;
     }
-
     if (ev === 'REAL_MAC_FAILED_DEFENSE') backendMacResult.current = "defense_caught";
     if (ev === 'REAL_MAC_FAILED_ATTACK') backendMacResult.current = "attack_caught";
     if (ev === 'CIRCUIT_BUILT') backendMacResult.current = "valid";
@@ -66,6 +68,7 @@ export function Scenario2Canvas({
 
   useEffect(() => {
     if (!isAttacking) {
+      runIdRef.current += 1; // מחסל כל אנימציה שרצה ברקע
       setPackets([]);
       setCircuitBroken(false);
       setLayer1Active(false);
@@ -85,9 +88,14 @@ export function Scenario2Canvas({
     }
 
     isActiveRef.current = true;
+    runIdRef.current += 1;
+    const currentRunId = runIdRef.current;
+
+    // פונקציית עזר לבדיקה האם צריך לעצור את הריצה הנוכחית
+    const isAborted = () => !isActiveRef.current || runIdRef.current !== currentRunId;
 
     const runSimulation = async () => {
-      while (isActiveRef.current) {
+      while (isActiveRef.current && runIdRef.current === currentRunId) {
         setLayer1Active(false);
         setLayer1Broken(false);
         setLayer2Active(false);
@@ -97,6 +105,7 @@ export function Scenario2Canvas({
         setShowVerification(false);
         setVerificationStatus(null);
         setFrozenPacket(false);
+        setPackets([]); // חובה לאפס חבילות בתחילת כל סייקל!
         
         backendStartRef.current = false;
         backendMacResult.current = "none";
@@ -104,69 +113,85 @@ export function Scenario2Canvas({
 
         addLogRef.current("info", "Visualizer: Waiting for C Engine to trigger circuit build...");
         
-        while (!backendStartRef.current && isActiveRef.current) {
+        while (!backendStartRef.current && !isAborted()) {
             await sleep(200);
         }
 
-        if (!isActiveRef.current) return;
+        if (isAborted()) return; // יציאה מיידית אם התבקשנו להפסיק
         backendStartRef.current = false;
 
         addLogRef.current("success", "Visualizer: Circuit initialization detected! Animating...");
 
         setPackets([{ id: `p-${Date.now()}`, path: [clientPos, guardPos], type: "normal" }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         setPackets([{ id: `p-${Date.now()}`, path: [guardPos, clientPos], type: "normal" }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         setLayer1Active(true);
         await sleep(800);
+        if (isAborted()) return;
 
         setPackets([{ id: `p-${Date.now()}`, path: [clientPos, guardPos], type: "encrypted", encryptionLayers: 1 }]);
         await sleep(800);
+        if (isAborted()) return;
+        
         setPackets([{ id: `p-${Date.now()}`, path: [guardPos, middlePos], type: "normal" }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         setPackets([{ id: `p-${Date.now()}`, path: [middlePos, guardPos], type: "normal" }]);
         await sleep(800);
+        if (isAborted()) return;
+        
         setPackets([{ id: `p-${Date.now()}`, path: [guardPos, clientPos], type: "encrypted", encryptionLayers: 1 }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         setLayer2Active(true);
         await sleep(800);
+        if (isAborted()) return;
 
         setPackets([{ id: `p-${Date.now()}`, path: [clientPos, guardPos], type: "encrypted", encryptionLayers: 2 }]);
         await sleep(800);
+        if (isAborted()) return;
+        
         setPackets([{ id: `p-${Date.now()}`, path: [guardPos, middlePos], type: "encrypted", encryptionLayers: 1 }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         setShowHijackPath(true); 
         setPackets([{ id: `p-${Date.now()}`, path: [middlePos, targetAPos], type: "corrupted" }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         setPackets([{ id: `p-${Date.now()}`, path: [targetAPos, middlePos], type: "corrupted" }]);
         await sleep(800);
+        if (isAborted()) return;
+        
         setPackets([{ id: `p-${Date.now()}`, path: [middlePos, guardPos], type: "encrypted", encryptionLayers: 1 }]);
         await sleep(800);
+        if (isAborted()) return;
         
         setPackets([{ id: `p-${Date.now()}`, path: [guardPos, clientPos], type: "encrypted", encryptionLayers: 2 }]);
         await sleep(800);
-        if (!isActiveRef.current) return;
+        if (isAborted()) return;
 
         if (!isDefending) {
           setLayer3Hijacked(true);
           await sleep(1000);
+          if (isAborted()) return;
 
           setPackets([{ id: `d1-${Date.now()}`, path: [clientPos, guardPos], type: "encrypted", encryptionLayers: 3 }]);
           await sleep(800);
+          if (isAborted()) return;
+          
           setPackets([{ id: `d2-${Date.now()}`, path: [guardPos, middlePos], type: "encrypted", encryptionLayers: 2 }]);
           await sleep(800);
+          if (isAborted()) return;
+          
           setPackets([{ id: `d3-${Date.now()}`, path: [middlePos, targetAPos], type: "corrupted" }]);
           
           await sleep(10000);
@@ -177,31 +202,36 @@ export function Scenario2Canvas({
           setVerificationStatus("checking");
           addLogRef.current("info", "Visualizer: Awaiting C Engine MAC Validation...");
           
-          // התיקון: חובה לחכות לפחות 2 שניות כדי לראות את האנימציה הכחולה לפני קבלת ההחלטה!
           await sleep(2000);
+          if (isAborted()) return;
 
           let waitTime = 0;
-          while (backendMacResult.current === "none" && waitTime < 15000 && isActiveRef.current) {
+          while (backendMacResult.current === "none" && waitTime < 15000 && !isAborted()) {
               await sleep(200);
               waitTime += 200;
           }
 
-          if (!isActiveRef.current) return;
+          if (isAborted()) return;
 
           if (backendMacResult.current === "defense_caught") {
              setVerificationStatus("failed");
              addLogRef.current("error", "Visualizer: MAC Signature Mismatch! Circuit Hijacking blocked.");
              await sleep(2000);
+             if (isAborted()) return;
 
              setShowVerification(false);
              setFrozenPacket(false);
              
              setCircuitBroken(true);
              await sleep(1000);
+             if (isAborted()) return;
+             
              setLayer2Active(false);
              setShowHijackPath(false);
              
              await sleep(1000);
+             if (isAborted()) return;
+             
              setLayer1Broken(true);
              await sleep(1000);
              setLayer1Active(false);
@@ -210,6 +240,8 @@ export function Scenario2Canvas({
           } else if (backendMacResult.current === "valid") {
              setVerificationStatus("success");
              await sleep(1500);
+             if (isAborted()) return;
+             
              setShowVerification(false);
              setFrozenPacket(false);
              addLogRef.current("success", "Visualizer: MAC Signature Valid. No malicious tampering detected.");
@@ -227,6 +259,7 @@ export function Scenario2Canvas({
 
     return () => {
       isActiveRef.current = false;
+      runIdRef.current += 1; // מבטיח יציאה מיידית בניקוי
     };
   }, [isAttacking, isDefending]);
 

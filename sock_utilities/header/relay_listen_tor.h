@@ -11,7 +11,7 @@
 #include "common.h"
 #include "sock_utilities.h"
 
-#define MAX_CONNECTIONS 10
+#define MAX_CONNECTIONS 128
 
 /**
  * @brief this function creates a listening socket on any available port on the loopback interface.

@@ -157,7 +157,7 @@ int main(void)
                 perror("sendto failed");
             }
             index = (index + 1) % target_guard_amount;
-            usleep(10);
+            usleep(25000);
 
         }
         free(guards_list);

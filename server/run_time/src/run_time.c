@@ -320,11 +320,14 @@ static bool handle_send_relay(int client_fd)
         fetched_relays = get_relay_batch(relay_list, &start, MAX_RELAY_BATCH_SIZE);
         simulation_state = simulation_state_get_copy();
 
+        // --- התיקון: ביטול הסתרת הראוטר הזדוני תמיד ---
+        /*
         if(simulation_state.attack_sybil_active == false)
         {
             fetched_relays = hide_attacker_controlled_relays(relay_list, fetched_relays);
         }
         else
+        */
         {
             if(simulation_state.def_sybil_active == false)
             {
@@ -532,7 +535,7 @@ server_running_status_e run_dir_server(const char *config_file)
         }
         else
         {
-            if(listen(server_socket_fd,10) < 0)
+            if(listen(server_socket_fd,128) < 0)
             {
                 perror("listen");
                 close(server_socket_fd);

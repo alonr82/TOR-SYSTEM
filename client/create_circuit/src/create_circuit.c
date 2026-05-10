@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 static const uint8_t DIR_SERVER_PUB_KEY[32] = {
     0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7, 
@@ -363,19 +364,25 @@ static bool verify_extend_response(circuit_t *circuit, uint8_t client_ephemeral_
                 }
                 else
                 {
-                    extern g_client_defense_active;
+                    extern bool g_client_defense_active; // תוקן הפורמט!
                     uint8_t *relay_id_pub = circuit->relay_descripts[circuit->hops_created].identify_pub;
+                    
+                    // --- סנכרון עם האנימציה - השהיה של 3 שניות ---
+                    usleep(3000000); 
+
                     if(!tor_ed25519_verify(relay_id_pub, extended->created_data.sig, extended->created_data.relay_x25519_pub, TOR_X25519_KEY_LEN))
                     {
                         if(g_client_defense_active == true)
                         {
-                            printf("\n [defense is active] invalid signature in EXTENDED! (potential attack detected, but defense is active\n> ");
+                            printf("\n [defense is active] invalid signature in EXTENDED!\n");
+                            fflush(stdout);
                             retval = false;
                         }
                         else
                         {
                             printf("[!!! SECURITY ALERT !!!] Invalid signature in EXTENDED response!\n");
                             printf("defense against malicious relay is NOT active.\n");
+                            fflush(stdout);
                         }
                     }
                     else
@@ -434,6 +441,10 @@ bool build_default_circuit(circuit_t *circuit, relay_decript_t *relay_list)
     bool retval = true;
     circuit->len = CIRCUIT_LEN;
     circuit->hops_created = 0;
+
+    printf("Selecting route...\n");
+    fflush(stdout);
+    usleep(500000);
 
     if(circuit_connect_guard(circuit) < 0)
     {

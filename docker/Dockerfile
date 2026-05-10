@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
     libsqlcipher-dev \
     valgrind \
     pkg-config \
+    tcpdump \
+    net-tools \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 COPY . /app

@@ -424,6 +424,14 @@ static int compare_relays(const void *a, const void *b)
     {
         retval = 1;
     }
+    else if (ra->data->descriptor.is_malicious < rb->data->descriptor.is_malicious)
+    {
+        retval = -1;
+    }
+    else if (ra->data->descriptor.is_malicious > rb->data->descriptor.is_malicious)
+    {
+        retval = 1;
+    }
 
     return retval;
 }

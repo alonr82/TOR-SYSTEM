@@ -30,22 +30,26 @@ function startPeer(onReady) {
 
     peerProcess.stdin.on('error', (err) => console.error(`[PIPE ERROR]: ${err.message}`));
 
+    let stdoutBuffer = "";
+
     peerProcess.stdout.on('data', (data) => {
         const text = data.toString();
         console.log(`[C CLIENT]: ${text.trim()}`);
+        stdoutBuffer += text;
 
-        // אתחול אוטומטי של תוכנת ה-C
-        if (text.includes('Enter local listen port:')) {
-            const port = connectionConfig?.listenPort || "34523";
-            console.log(`[NODE] Auto-typing port: ${port}`);
+        if (stdoutBuffer.includes('Enter local listen port:')) {
+            const port = Math.floor(30000 + Math.random() * 10000);
+            console.log(`[NODE] Auto-typing random port: ${port}`);
             peerProcess.stdin.write(`${port}\n`);
+            stdoutBuffer = stdoutBuffer.replace('Enter local listen port:', '');
         }
-        else if (text.includes('Enter Master Password')) {
+        else if (stdoutBuffer.includes('Enter Master Password')) {
             const pwd = connectionConfig?.dbPassword || "12345";
             console.log(`[NODE] Auto-typing vault password...`);
             peerProcess.stdin.write(`${pwd}\n`);
+            stdoutBuffer = stdoutBuffer.replace('Enter Master Password', '');
         }
-        else if (text.includes("Press ENTER to build a default protected circuit")) {
+        else if (stdoutBuffer.includes("Press ENTER to build a default protected circuit")) {
             if (connectionConfig?.routeMode === 'custom') {
                 console.log("[NODE] Selecting Custom Route ('c')");
                 peerProcess.stdin.write("c\n");
@@ -53,8 +57,23 @@ function startPeer(onReady) {
                 console.log("[NODE] Selecting Default Route (ENTER)");
                 peerProcess.stdin.write("\n");
             }
+            stdoutBuffer = stdoutBuffer.replace('Press ENTER to build a default protected circuit', '');
         }
-        else if (text.includes('Chat interface ready') || text.includes('> ')) {
+        // --- התיקון הקריטי למסלול קאסטום ---
+        else if (stdoutBuffer.includes("Enter 3 relay indices separated by space")) {
+            const routeStr = connectionConfig?.customRoute; 
+            
+            if (routeStr) {
+                console.log(`[NODE] Typing user custom route from React UI: ${routeStr}`);
+                peerProcess.stdin.write(`${routeStr}\n`);
+            } else {
+                // מקרה חירום למקרה שהריאקט לא שלח נתונים
+                console.error("[NODE] ERROR: React did not send customRoute! Falling back to 0 1 2 to prevent crash.");
+                peerProcess.stdin.write("0 1 2\n");
+            }
+            stdoutBuffer = stdoutBuffer.replace("Enter 3 relay indices", "");
+        }
+        else if (stdoutBuffer.includes('Chat interface ready') || stdoutBuffer.includes('> ')) {
             if (!isPeerReady) {
                 console.log("✅ [NODE] C Client inside Docker is READY!");
                 isPeerReady = true;
@@ -63,17 +82,15 @@ function startPeer(onReady) {
                     connectionCallback = null;
                 }
             }
+            stdoutBuffer = stdoutBuffer.replace('Chat interface ready', '').replace('> ', '');
         }
 
-        // --- התיקון הגדול מס' 1: חיבור מוצלח ---
         if (text.includes('Connected! Circuit built')) {
-            // שולפים את ה-ID של החיבור שה-C קבע (לרוב זה 0)
             const match = text.match(/Connection ID (\d+)/);
             const connId = match ? parseInt(match[1]) : 0;
 
             wss.clients.forEach(client => {
                 if (client.readyState === WebSocket.OPEN) {
-                    // 1. אומרים ל-useMailbox.js שהפקודה הצליחה ומעבירים לו את ה-ID
                     client.send(JSON.stringify({
                         type: 'ack',
                         command: 'CONNECT',
@@ -81,7 +98,6 @@ function startPeer(onReady) {
                         connectionId: connId
                     }));
 
-                    // 2. מקפיצים ל-Inbox הודעת מערכת ירוקה שהחיבור הושלם
                     client.send(JSON.stringify({
                         type: 'connected',
                         connectionId: connId,
@@ -91,13 +107,11 @@ function startPeer(onReady) {
             });
         }
 
-        // --- התיקון הגדול מס' 2: קבלת הודעות חזרה! ---
         if (text.includes('[Peer ')) {
             const match = text.match(/\[Peer (\d+)\] (.*)/);
             if (match) {
                 wss.clients.forEach(client => {
                     if (client.readyState === WebSocket.OPEN) {
-                        // מעבירים את ההודעה לריאקט כדי שתקפוץ ב-Inbox
                         client.send(JSON.stringify({
                             type: 'incoming_message',
                             chatId: parseInt(match[1]),
@@ -106,6 +120,16 @@ function startPeer(onReady) {
                         }));
                     }
                 });
+            }
+        }
+
+        if (text.includes('[System] Failed to build connection.')) {
+            if (connectionConfig) {
+                console.log("⚠️ [NODE] Connection intercepted by malicious relay! Retrying automatically...");
+                setTimeout(() => {
+                    console.log(`[NODE] Re-Injecting command: /connect ${connectionConfig.ip} ${connectionConfig.port}`);
+                    peerProcess.stdin.write(`/connect ${connectionConfig.ip} ${connectionConfig.port}\n`);
+                }, 1500); 
             }
         }
     });
@@ -122,7 +146,6 @@ function startPeer(onReady) {
 wss.on('connection', (ws) => {
     console.log("🟢 React Mail Client connected!");
 
-    // מסמנים לריאקט שהגשר פתוח כדי להוריד חיווי שגיאות מהממשק
     ws.send(JSON.stringify({ type: 'bridge_ready', port: 8081 }));
 
     ws.on('message', (message) => {
@@ -133,12 +156,16 @@ wss.on('connection', (ws) => {
                 console.log(`\n[REACT] Connection request to ${data.ip}:${data.port}`);
                 connectionConfig = data; 
                 startPeer(() => {
-                    console.log(`[NODE] Injecting command: /connect ${data.ip} ${data.port}`);
-                    peerProcess.stdin.write(`/connect ${data.ip} ${data.port}\n`);
+                    console.log("[NODE] Activating Security Defenses for Mail Client...");
+                    peerProcess.stdin.write("/defense on\n");
+
+                    setTimeout(() => {
+                        console.log(`[NODE] Injecting command: /connect ${data.ip} ${data.port}`);
+                        peerProcess.stdin.write(`/connect ${data.ip} ${data.port}\n`);
+                    }, 500);
                 });
             }
 
-            // --- התיקון הגדול מס' 3: תפיסת השליחה מהריאקט ---
             if (data.type === 'send_message') {
                 console.log(`\n[REACT] Sending message: ${data.message}`);
                 
@@ -149,10 +176,8 @@ wss.on('connection', (ws) => {
                 const connId = data.connectionId !== undefined ? data.connectionId : 0;
                 console.log(`[NODE] Injecting command: /send ${connId} ${data.message}`);
                 
-                // הזרקת ההודעה לתוכנת ה-C
                 peerProcess.stdin.write(`/send ${connId} ${data.message}\n`);
                 
-                // שליחת ACK לריאקט כדי שיסיים את האנימציה של המודל ויעביר לתיקיית Sent
                 ws.send(JSON.stringify({
                     type: 'ack',
                     command: 'SEND',

@@ -321,14 +321,20 @@ export function useMailbox() {
   function openComposeModal() { setComposeOpen(true); }
 
   function startConnect() {
+    // 1. מרכיבים את מחרוזת המסלול משלושת השדות (למשל: "0 2 1")
+    const routeString = `${connectForm.route0} ${connectForm.route1} ${connectForm.route2}`;
+
     const payload = {
       type: "connect",
       ip: connectForm.ip,
       port: Number(connectForm.port),
       routeMode: connectForm.routeMode,
       vaultPassword: connectForm.dbPassword,
-      localPort: connectForm.listenPort
+      localPort: connectForm.listenPort,
+      // 2. מוסיפים את המסלול לפיילואוד שנשלח לשרת!
+      customRoute: routeString
     };
+    
     sendToBridge(payload);
   }
 

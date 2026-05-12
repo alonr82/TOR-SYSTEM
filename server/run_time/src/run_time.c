@@ -34,6 +34,7 @@ static void print_simulation_state(void)
            state.attack_fingerprint_active,
            state.def_fingerprint_active,
            state.mock_cpu_load);
+    fflush(stdout);
 }
 
 static void bytes_to_hex_string(const uint8_t* input, uint32_t input_len, char* output, uint32_t output_size)
@@ -299,6 +300,8 @@ static void log_exported_relays(relay_decript_t* relay_list, uint32_t fetched_re
                relay_list[index].same_source_count,
                relay_list[index].uptime_seconds);
     }
+    // התיקון הקריטי! משחרר את הנתונים ל-Docker מיד!
+    fflush(stdout); 
 }
 
 static bool handle_send_relay(int client_fd)
@@ -320,23 +323,20 @@ static bool handle_send_relay(int client_fd)
         fetched_relays = get_relay_batch(relay_list, &start, MAX_RELAY_BATCH_SIZE);
         simulation_state = simulation_state_get_copy();
 
-        // --- התיקון: ביטול הסתרת הראוטר הזדוני תמיד ---
-        /*
-        if(simulation_state.attack_sybil_active == false)
+        // --- התיקון הארכיטקטוני שלך: הפעלת הסינון כשהסימולציה כבויה ---
+        if(simulation_state.attack_circ_ext_active == false && simulation_state.attack_sybil_active == false)
         {
             fetched_relays = hide_attacker_controlled_relays(relay_list, fetched_relays);
         }
-        else
-        */
+        // -------------------------------------------------------------
+
+        if(simulation_state.def_sybil_active == false && simulation_state.attack_sybil_active == true)
         {
-            if(simulation_state.def_sybil_active == false)
-            {
-                simulation_log_warn("Sybil attack active without defense: attacker-controlled relays are visible to clients");
-            }
-            else
-            {
-                simulation_log_info("Sybil defense active: only mature relays keep Guard flag");
-            }
+            simulation_log_warn("Sybil attack active without defense: attacker-controlled relays are visible to clients");
+        }
+        else if(simulation_state.def_sybil_active == true)
+        {
+            simulation_log_info("Sybil defense active: only mature relays keep Guard flag");
         }
 
         apply_relay_flags_to_export(relay_list, fetched_relays, simulation_state.def_sybil_active);
@@ -466,6 +466,7 @@ static void client_callback(user_descriptor_t* user)
                            new_relay->descriptor.is_malicious,
                            new_relay->descriptor.is_guard,
                            new_relay->descriptor.uptime_seconds);
+                    fflush(stdout);
                     close(user->fd);
                 }
             }
@@ -484,6 +485,7 @@ static void client_callback(user_descriptor_t* user)
             else
             {
                 printf("Removed relay with ID: %u\n", request.request_u.relay_req.request_details_u.signout_request.relay_id);
+                fflush(stdout);
                 close(user->fd);
             }
         }

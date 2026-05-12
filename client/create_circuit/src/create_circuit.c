@@ -364,10 +364,9 @@ static bool verify_extend_response(circuit_t *circuit, uint8_t client_ephemeral_
                 }
                 else
                 {
-                    extern bool g_client_defense_active; // תוקן הפורמט!
+                    extern bool g_client_defense_active;
                     uint8_t *relay_id_pub = circuit->relay_descripts[circuit->hops_created].identify_pub;
                     
-                    // --- סנכרון עם האנימציה - השהיה של 3 שניות ---
                     usleep(3000000); 
 
                     if(!tor_ed25519_verify(relay_id_pub, extended->created_data.sig, extended->created_data.relay_x25519_pub, TOR_X25519_KEY_LEN))
